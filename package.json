@@ -4,7 +4,8 @@
   "description": "Monitors Pokemon TCG product listings on Target, Walmart, and Best Buy for new releases",
   "main": "monitor.js",
   "scripts": {
-    "start": "node monitor.js",
+    "start": "node tools/run-monitor-service.js",
+    "start:monitor": "node monitor.js",
     "dev": "node monitor.js --once",
     "cron": "node -e \"require('node-cron').schedule(require('./config').checkInterval, () => require('./monitor').run());\"",
     "serve:run-monitor": "node tools/run-monitor-service.js",

@@ -107,8 +107,9 @@ app.post('/run_monitor', async (req, res) => {
 });
 
 if (require.main === module) {
+  const hasHostedPort = Boolean(process.env.PORT);
   const port = parseInt(process.env.RUN_MONITOR_PORT || process.env.PORT || '8787', 10);
-  const host = process.env.RUN_MONITOR_HOST || '127.0.0.1';
+  const host = process.env.RUN_MONITOR_HOST || (hasHostedPort ? '0.0.0.0' : '127.0.0.1');
   app.listen(port, host, () => {
     console.log(`[run_monitor] listening on http://${host}:${port}`);
     console.log(`[run_monitor] auth ${token ? 'enabled' : 'disabled'}${host === '127.0.0.1' ? ' (local bind)' : ''}`);

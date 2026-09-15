@@ -133,7 +133,7 @@ For ChatGPT/tool integration, the repo includes a minimal local HTTP bridge arou
 npm run serve:run-monitor
 ```
 
-By default it binds to `127.0.0.1:8787` and exposes:
+By default it binds to `127.0.0.1:8787`. When a host such as Render supplies `PORT`, it binds to `0.0.0.0:$PORT`. It exposes:
 
 ```http
 GET /health
@@ -179,6 +179,23 @@ POST /run_monitor
 ```
 
 Set `RUN_MONITOR_TOKEN` to require `Authorization: Bearer <token>` on `POST /run_monitor`. Leave `RUN_MONITOR_HOST` unset for local-only binding. To make ChatGPT invoke it directly, deploy this service behind HTTPS and connect a custom tool/plugin/action that calls `POST /run_monitor` with that bearer token.
+
+Render deployment settings:
+
+```text
+Runtime: Node
+Build command: npm install
+Start command: npm start
+Health check path: /health
+```
+
+Environment:
+
+```text
+RUN_MONITOR_TOKEN = <long random secret>
+```
+
+Render supplies `PORT`; do not commit or paste the bearer token into source control.
 
 ---
 
