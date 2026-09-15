@@ -49,4 +49,11 @@ describe('run-monitor service OpenAPI server URL', () => {
     assert.deepEqual(Object.keys(spec.paths), ['/run_monitor']);
     assert.equal(spec.paths['/run_monitor'].post.operationId, 'run_monitor');
   });
+
+  it('advertises visual_summary in the run_monitor payload', () => {
+    const spec = openApiSpec(makeReq());
+    const responseSchema = spec.components.schemas.RunMonitorResponse;
+    assert.ok(responseSchema.required.includes('visual_summary'));
+    assert.equal(responseSchema.properties.visual_summary.description.includes('Chart-ready summary'), true);
+  });
 });

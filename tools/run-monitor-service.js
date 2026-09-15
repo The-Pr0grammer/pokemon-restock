@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const express = require('express');
+const { buildVisualSummary } = require('./generate-observations-dashboard');
 
 process.env.NOTIFY_CHANNELS = '';
 process.env.EMAIL_ENABLED = 'false';
@@ -189,9 +190,19 @@ function openApiSpec(req) {
               type: 'array',
               items: { type: 'object' },
             },
+            visual_summary: {
+              type: 'object',
+              description: 'Chart-ready summary for source health, procurement funnel, and opportunity spread. Use this to render conversational charts or compact text bars.',
+              properties: {
+                generated_at: { type: 'string' },
+                source_health: { type: 'array', items: { type: 'object' } },
+                funnel: { type: 'object' },
+                signals: { type: 'array', items: { type: 'object' } },
+              },
+            },
             error: { type: 'string' },
           },
-          required: ['run_id', 'status', 'started_at', 'completed_at', 'duration_ms', 'sources', 'observations', 'market_estimates', 'opportunity_candidates'],
+          required: ['run_id', 'status', 'started_at', 'completed_at', 'duration_ms', 'sources', 'observations', 'market_estimates', 'opportunity_candidates', 'visual_summary'],
         },
         ErrorResponse: {
           type: 'object',
@@ -213,28 +224,50 @@ async function executeRunMonitor() {
 
   try {
     const result = await run({ isDryRun: true, forceInit: false });
+    const completedAt = new Date().toISOString();
+    const sources = sourcesFrom(result.sourceStatuses || []);
+    const observations = result.observations || [];
+    const marketEstimates = result.marketEstimates || [];
+    const opportunityCandidates = result.opportunityCandidates || [];
+    const visualSummary = buildVisualSummary({
+      observations,
+      candidates: opportunityCandidates,
+      sourceStatuses: { statuses: result.sourceStatuses || [] },
+      marketEstimates,
+      generatedAt: completedAt,
+    });
+
     return {
       run_id: runId,
       status: 'success',
       started_at: startedAt,
-      completed_at: new Date().toISOString(),
+      completed_at: completedAt,
       duration_ms: Date.now() - t0,
-      sources: sourcesFrom(result.sourceStatuses || []),
-      observations: result.observations || [],
-      market_estimates: result.marketEstimates || [],
-      opportunity_candidates: result.opportunityCandidates || [],
+      sources,
+      observations,
+      market_estimates: marketEstimates,
+      opportunity_candidates: opportunityCandidates,
+      visual_summary: visualSummary,
     };
   } catch (err) {
+    const completedAt = new Date().toISOString();
     return {
       run_id: runId,
       status: 'error',
       started_at: startedAt,
-      completed_at: new Date().toISOString(),
+      completed_at: completedAt,
       duration_ms: Date.now() - t0,
       sources: [],
       observations: [],
       market_estimates: [],
       opportunity_candidates: [],
+      visual_summary: buildVisualSummary({
+        observations: [],
+        candidates: [],
+        sourceStatuses: { statuses: [] },
+        marketEstimates: [],
+        generatedAt: completedAt,
+      }),
       error: err.message,
     };
   }
