@@ -119,6 +119,10 @@ jobs:
           fi
           node monitor.js $FLAGS 2>&1 | tee artifacts/restock-dry-run/monitor.log
 
+      - name: Generate dry-run dashboard
+        if: ${{ always() && github.event.inputs.dry_run == 'true' }}
+        run: node tools/generate-observations-dashboard.js artifacts/restock-dry-run/observations.json artifacts/restock-dry-run/dashboard.html
+
       - name: Isolate dry-run state mutations
         if: ${{ always() && github.event.inputs.dry_run == 'true' }}
         run: |
