@@ -7,6 +7,7 @@
     "start": "node monitor.js",
     "dev": "node monitor.js --once",
     "cron": "node -e \"require('node-cron').schedule(require('./config').checkInterval, () => require('./monitor').run());\"",
+    "serve:run-monitor": "node tools/run-monitor-service.js",
     "test": "node --test"
   },
   "dependencies": {

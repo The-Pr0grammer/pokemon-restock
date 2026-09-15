@@ -125,6 +125,63 @@ Starts immediately, then repeats every 15 minutes using the built-in scheduler. 
 
 ---
 
+## `run_monitor` Bridge
+
+For ChatGPT/tool integration, the repo includes a minimal local HTTP bridge around the existing safe dry-run monitor:
+
+```bash
+npm run serve:run-monitor
+```
+
+By default it binds to `127.0.0.1:8787` and exposes:
+
+```http
+GET /health
+POST /run_monitor
+```
+
+`POST /run_monitor` takes no body and no arbitrary command input. It executes the current safe Barnes & Noble dry-run observation slice, disables notifications, avoids state persistence, preserves source timeouts, and returns structured JSON:
+
+```json
+{
+  "run_id": "uuid",
+  "status": "success",
+  "started_at": "2026-09-15T00:00:00.000Z",
+  "completed_at": "2026-09-15T00:00:20.500Z",
+  "duration_ms": 20500,
+  "sources": [
+    {
+      "source": "barnesandnoble",
+      "status": "success",
+      "product_count": 4,
+      "elapsed_ms": 8032,
+      "message": null
+    }
+  ],
+  "observations": [
+    {
+      "source": "barnesandnoble",
+      "source_type": "retail_listing",
+      "source_listing_id": "9050817364209",
+      "product_id": "820650856952",
+      "name": "Pokemon Battle Academy Board Game",
+      "price": 24.99,
+      "currency": "USD",
+      "availability": "in_stock",
+      "url": "https://www.barnesandnoble.com/w/0820650856952/820650856952",
+      "observed_at": "2026-09-15T00:00:00.000Z",
+      "confidence": "verified",
+      "source_status": "success",
+      "raw_status": "in_stock"
+    }
+  ]
+}
+```
+
+Set `RUN_MONITOR_TOKEN` to require `Authorization: Bearer <token>` on `POST /run_monitor`. Leave `RUN_MONITOR_HOST` unset for local-only binding. To make ChatGPT invoke it directly, deploy this service behind HTTPS and connect a custom tool/plugin/action that calls `POST /run_monitor` with that bearer token.
+
+---
+
 ## Getting a Discord Webhook URL
 
 1. Open Discord and go to the server where you want alerts
