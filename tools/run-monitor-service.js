@@ -71,19 +71,19 @@ function openApiSpec(req) {
     info: {
       title: 'Pokemon Restock Monitor',
       version: '0.2.0',
-      description: 'Runs the safe Pokemon opportunity sweep and returns source statuses, canonical observations, market estimates, and opportunity candidates.',
+      description: 'Runs the safe Pokemon opportunity sweep and returns source statuses, canonical observations, market estimates, opportunity candidates, and a chart-ready visual_summary for source health, procurement funnel, and market opportunity charts.',
     },
     servers: [{ url: publicBaseUrl(req) }],
     paths: {
       '/run_monitor': {
         post: {
           operationId: 'run_monitor',
-          summary: 'Run the safe Pokemon restock monitor dry-run',
-          description: 'Runs a broad read-only retail observation sweep with notifications disabled and no persistent state mutation, then enriches verified direct listings with independent market evidence.',
+          summary: 'Run the safe Pokemon restock monitor dry-run and return chart-ready results',
+          description: 'Runs a broad read-only retail observation sweep with notifications disabled and no persistent state mutation, then enriches verified direct listings with independent market evidence. The response includes visual_summary, a chart-ready payload for source health, procurement funnel, and market opportunity graphs. Use visual_summary to render charts or compact text bars after every run.',
           security: [{ bearerAuth: [] }],
           responses: {
             200: {
-              description: 'Monitor completed and returned structured observations',
+              description: 'Monitor completed and returned structured observations plus chart-ready visual_summary data',
               content: {
                 'application/json': {
                   schema: { $ref: '#/components/schemas/RunMonitorResponse' },

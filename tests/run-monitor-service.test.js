@@ -54,6 +54,9 @@ describe('run-monitor service OpenAPI server URL', () => {
     const spec = openApiSpec(makeReq());
     const responseSchema = spec.components.schemas.RunMonitorResponse;
     assert.equal(spec.info.version, '0.2.0');
+    assert.match(spec.info.description, /chart-ready visual_summary/);
+    assert.match(spec.paths['/run_monitor'].post.summary, /chart-ready/);
+    assert.match(spec.paths['/run_monitor'].post.description, /market opportunity graphs/);
     assert.ok(responseSchema.required.includes('visual_summary'));
     assert.deepEqual(responseSchema.properties.visual_summary, { $ref: '#/components/schemas/VisualSummary' });
     assert.equal(spec.components.schemas.VisualSummary.description.includes('Chart-ready summary'), true);
