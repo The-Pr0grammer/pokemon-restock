@@ -114,7 +114,7 @@ describe('observations dashboard visual summary', () => {
 
     assert.match(html, /Source Health/);
     assert.match(html, /Procurement Funnel/);
-    assert.match(html, /Opportunity Spread/);
+    assert.match(html, /Market Opportunity/);
     assert.match(html, /Opportunity Candidates/);
     assert.match(html, /Observations/);
     assert.match(html, /&lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt;/);

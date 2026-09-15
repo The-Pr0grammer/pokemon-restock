@@ -53,7 +53,17 @@ describe('run-monitor service OpenAPI server URL', () => {
   it('advertises visual_summary in the run_monitor payload', () => {
     const spec = openApiSpec(makeReq());
     const responseSchema = spec.components.schemas.RunMonitorResponse;
+    assert.equal(spec.info.version, '0.2.0');
     assert.ok(responseSchema.required.includes('visual_summary'));
-    assert.equal(responseSchema.properties.visual_summary.description.includes('Chart-ready summary'), true);
+    assert.deepEqual(responseSchema.properties.visual_summary, { $ref: '#/components/schemas/VisualSummary' });
+    assert.equal(spec.components.schemas.VisualSummary.description.includes('Chart-ready summary'), true);
+    assert.deepEqual(Object.keys(spec.components.schemas.VisualFunnel.properties), [
+      'observed',
+      'verified',
+      'actionable',
+      'enriched',
+      'investigate',
+      'opportunities',
+    ]);
   });
 });
