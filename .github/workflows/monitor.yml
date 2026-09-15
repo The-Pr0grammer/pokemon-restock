@@ -1,8 +1,6 @@
 name: Pokemon TCG Restock Monitor
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       init:
@@ -12,7 +10,7 @@ on:
       dry_run:
         description: 'Dry run (scrape + compare, skip notifications and state write)'
         type: boolean
-        default: false
+        default: true
 
 concurrency:
   group: monitor
@@ -92,6 +90,8 @@ jobs:
       - name: Run monitor
         id: monitor
         run: |
+          set -o pipefail
+          mkdir -p artifacts/restock-dry-run
           FLAGS="--once"
           if [[ "${{ github.event.inputs.init }}" == "true" ]]; then
             FLAGS="$FLAGS --init"
@@ -99,7 +99,23 @@ jobs:
           if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
             FLAGS="$FLAGS --test"
           fi
-          node monitor.js $FLAGS
+          node monitor.js $FLAGS 2>&1 | tee artifacts/restock-dry-run/monitor.log
+
+      - name: Isolate dry-run state mutations
+        if: ${{ always() && github.event.inputs.dry_run == 'true' }}
+        run: |
+          mkdir -p artifacts/restock-dry-run
+          git checkout -- data/pc-queue-history.json data/products.json data/msrp-database.json 2>/dev/null || true
+          rm -f data/reddit-seen.json
+          git status --short > artifacts/restock-dry-run/worktree-status-after-cleanup.txt
+
+      - name: Upload dry-run artifact
+        if: ${{ always() && github.event.inputs.dry_run == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: restock-dry-run
+          path: artifacts/restock-dry-run/
+          if-no-files-found: error
 
       - name: Commit updated data files
         if: ${{ github.event.inputs.dry_run != 'true' }}
@@ -139,7 +155,7 @@ jobs:
           echo "| Job status | \`${{ job.status }}\` |" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Notify Discord on failure
-        if: failure()
+        if: ${{ failure() && github.event.inputs.dry_run != 'true' }}
         run: |
           PAYLOAD=$(jq -n \
             --arg title "Pokemon TCG Monitor failed" \
