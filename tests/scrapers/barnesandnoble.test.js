@@ -15,6 +15,6 @@ describe('Barnes & Noble scraper — isTcgProduct', () => {
 
   it('filters Pokemon books and social-media commentary listings', () => {
     assert.equal(isTcgProduct(makeRaw('Pokemon Adventures Manga Box Set')), false);
-    assert.equal(isTcgProduct(makeRaw('Why The Opening Pokemon Card Pack Video Genre Has Become Popular')), false);
+    assert.equal(isTcgProduct(makeRaw('Why The Opening Pokemon Trading Card Game Booster Card Packs Video Genre Has Become Popular')), false);
   });
 });

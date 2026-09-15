@@ -142,6 +142,7 @@ function isTcgProduct(raw) {
     'theme deck',
   ];
 
+  if (!/^pok[eé]mon\b/.test(title)) return false;
   if (!tcgSignals.some(s => title.includes(s))) return false;
 
   // B&N also sells Pokemon manga, novels, and art books — exclude those
