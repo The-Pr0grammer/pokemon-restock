@@ -43,6 +43,8 @@ const stateMod        = require('./stateManager');
 
 const DIVIDER = '━'.repeat(68);
 const SOURCE_STATUS_FILE = process.env.SOURCE_STATUS_FILE || '';
+const OBSERVATIONS_FILE = process.env.OBSERVATIONS_FILE || '';
+const OBSERVATION_SOURCE = process.env.OBSERVATION_SOURCE || 'barnesandnoble';
 const DEFAULT_SOURCE_BUDGET_MS = parseInt(process.env.SOURCE_TIMEOUT_MS || '30000', 10);
 
 const SOURCE_BUDGET_MS = {
@@ -124,6 +126,51 @@ function writeSourceStatuses(statuses) {
     generatedAt: new Date().toISOString(),
     statuses,
   }, null, 2));
+}
+
+function availabilityFromProduct(product) {
+  if (product.stockStatus === 'pre_order') return 'pre_order';
+  if (product.stockStatus === 'out_of_stock') return 'out_of_stock';
+  if (product.inStock === true || product.stockStatus === 'in_stock') return 'in_stock';
+  return 'unknown';
+}
+
+function canonicalObservation(product, sourceStatusEntry, observedAt) {
+  const source = product.retailer || sourceStatusEntry?.source || OBSERVATION_SOURCE;
+  const sourceListingId = product.shopifyId || product.tcin || product.sku || product.asin || product.ean || product.id || null;
+  const productId = product.ean || product.tcin || product.sku || product.asin || product.id || sourceListingId;
+
+  return {
+    source,
+    source_type: 'retail_listing',
+    source_listing_id: sourceListingId != null ? String(sourceListingId) : null,
+    product_id: productId != null ? String(productId) : null,
+    name: product.name || null,
+    price: Number.isFinite(product.priceNumeric) ? product.priceNumeric : null,
+    currency: product.priceNumeric != null ? 'USD' : null,
+    availability: availabilityFromProduct(product),
+    url: product.url || null,
+    observed_at: observedAt,
+    confidence: sourceStatusEntry?.status === 'success' ? 'verified' : 'unverified',
+    source_status: sourceStatusEntry?.status || 'unknown',
+    raw_status: product.stockStatus || null,
+  };
+}
+
+function buildCanonicalObservations(scraperResults, sourceStatuses, observedAt = new Date().toISOString()) {
+  const selected = scraperResults.find(r => r.key === OBSERVATION_SOURCE);
+  const status = sourceStatuses.find(s => s.source === OBSERVATION_SOURCE);
+
+  if (!selected || selected.status !== 'success') return [];
+  return (selected.products || []).map(product => canonicalObservation(product, status, observedAt));
+}
+
+function writeObservations(observations) {
+  if (!OBSERVATIONS_FILE) return;
+  const fs = require('fs');
+  const path = require('path');
+  fs.mkdirSync(path.dirname(OBSERVATIONS_FILE), { recursive: true });
+  fs.writeFileSync(OBSERVATIONS_FILE, JSON.stringify(observations, null, 2));
 }
 
 // ── First-run detection ───────────────────────────────────────────────────────
@@ -496,13 +543,15 @@ async function run({ isDryRun = false, forceInit = false } = {}) {
     }),
   ));
   sourceStatuses.push(redditResult.status);
+  const observations = buildCanonicalObservations(scraperResults, sourceStatuses, now);
+  writeObservations(observations);
 
   if (initMode) {
     // [4] Baseline — mark all current products as "already seen"
     await runInit(scraperResults, ++phase, totalPhases);
     printSummary({ runStart, isDryRun, initMode: true, totalSeen: 0, allNew: [], allRestocked: [] });
     writeSourceStatuses(sourceStatuses);
-    return { initMode: true, newProducts: [], restockedProducts: [], sourceStatuses };
+    return { initMode: true, newProducts: [], restockedProducts: [], sourceStatuses, observations };
   }
 
   // [4] Compare retailer results against stored state
@@ -529,7 +578,7 @@ async function run({ isDryRun = false, forceInit = false } = {}) {
   printSummary({ runStart, isDryRun, initMode: false, totalSeen, allNew, allRestocked });
   writeSourceStatuses(sourceStatuses);
 
-  return { initMode: false, newProducts: allNew, restockedProducts: allRestocked, sourceStatuses };
+  return { initMode: false, newProducts: allNew, restockedProducts: allRestocked, sourceStatuses, observations };
 }
 
 // ── CLI entry point ───────────────────────────────────────────────────────────
@@ -565,4 +614,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { run, classifyError, withSourceBudget };
+module.exports = { run, classifyError, withSourceBudget, buildCanonicalObservations };

@@ -72,6 +72,7 @@ jobs:
       FILTER_KEYWORDS: ${{ vars.FILTER_KEYWORDS }}
       MAX_PAGES:       ${{ vars.MAX_PAGES || '3' }}
       DRY_RUN_MAX_PAGES: ${{ vars.DRY_RUN_MAX_PAGES || '1' }}
+      OBSERVATION_SOURCE: ${{ vars.OBSERVATION_SOURCE || 'barnesandnoble' }}
       SOURCE_TIMEOUT_MS: ${{ vars.SOURCE_TIMEOUT_MS || '12000' }}
       PC_QUEUE_SOURCE_TIMEOUT_MS: ${{ vars.PC_QUEUE_SOURCE_TIMEOUT_MS || '8000' }}
       MSRP_SOURCE_TIMEOUT_MS: ${{ vars.MSRP_SOURCE_TIMEOUT_MS || '12000' }}
@@ -109,6 +110,10 @@ jobs:
             FLAGS="$FLAGS --test"
             export MAX_PAGES="$DRY_RUN_MAX_PAGES"
             export SOURCE_STATUS_FILE="artifacts/restock-dry-run/source-statuses.json"
+            export OBSERVATIONS_FILE="artifacts/restock-dry-run/observations.json"
+            if [[ "$OBSERVATION_SOURCE" == "barnesandnoble" ]]; then
+              export BN_ENABLED="true"
+            fi
           fi
           node monitor.js $FLAGS 2>&1 | tee artifacts/restock-dry-run/monitor.log
 

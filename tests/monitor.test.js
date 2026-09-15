@@ -5,13 +5,16 @@ const assert = require('node:assert/strict');
 const targetScraper  = require('../scrapers/target');
 const walmartScraper = require('../scrapers/walmart');
 const bestbuyScraper = require('../scrapers/bestbuy');
+const amazonScraper  = require('../scrapers/amazon');
+const gamestopScraper = require('../scrapers/gamestop');
+const bnScraper      = require('../scrapers/barnesandnoble');
 const pcScraper      = require('../scrapers/pokemoncenter');
 const redditMonitor  = require('../monitors/reddit');
 const notifierMod    = require('../notifier');
 const msrpMod        = require('../msrpChecker');
 const stateMod       = require('../stateManager');
 
-const { run } = require('../monitor');
+const { run, buildCanonicalObservations } = require('../monitor');
 
 const MOCK_PRODUCT = {
   id:           'target-111',
@@ -40,6 +43,9 @@ beforeEach(() => {
   targetScraper.scrapeTarget   = async () => [];
   walmartScraper.scrapeWalmart = async () => [];
   bestbuyScraper.scrapeBestBuy = async () => [];
+  amazonScraper.scrapeAmazon   = async () => [];
+  gamestopScraper.scrapeGameStop = async () => [];
+  bnScraper.scrapeBarnesAndNoble = async () => [];
   pcScraper.scrapePokemonCenter = async () => ({ queueEvent: null, isNewQueue: false, products: [] });
   redditMonitor.scrapeReddit    = async () => [];
   notifierMod.notify           = async () => ({});
@@ -175,19 +181,60 @@ describe('monitor.run — scraper error resilience', () => {
     let compareCallCount = 0;
     stateMod.compareAndUpdate = () => { compareCallCount++; return { newProducts: [], restockedProducts: [] }; };
 
-    // Should not throw; should still process walmart and bestbuy
+    // Should not throw; should still process walmart, bestbuy, and B&N
     await assert.doesNotReject(() => run({ isDryRun: true, forceInit: false }));
-    // Target failed, so compareAndUpdate only called for walmart + bestbuy
-    assert.equal(compareCallCount, 2);
+    // Target failed, so compareAndUpdate only called for successful retailers.
+    assert.equal(compareCallCount, 3);
   });
 
   it('returns empty results when all scrapers fail', async () => {
     targetScraper.scrapeTarget   = async () => { throw new Error('down'); };
     walmartScraper.scrapeWalmart = async () => { throw new Error('down'); };
     bestbuyScraper.scrapeBestBuy = async () => { throw new Error('down'); };
+    bnScraper.scrapeBarnesAndNoble = async () => { throw new Error('down'); };
 
     const result = await run({ isDryRun: true, forceInit: false });
     assert.equal(result.newProducts.length, 0);
     assert.equal(result.restockedProducts.length, 0);
+  });
+});
+
+describe('monitor observations artifact', () => {
+  it('emits canonical observations for the selected successful source', () => {
+    const observations = buildCanonicalObservations(
+      [{
+        key: 'barnesandnoble',
+        status: 'success',
+        products: [{
+          id: 'bn-9781234567890',
+          retailer: 'barnesandnoble',
+          ean: '9781234567890',
+          shopifyId: 'gid://shopify/Product/123',
+          name: 'Pokemon TCG Elite Trainer Box',
+          priceNumeric: 49.99,
+          url: 'https://www.barnesandnoble.com/w/example/9781234567890',
+          inStock: true,
+          stockStatus: 'in_stock',
+        }],
+      }],
+      [{ source: 'barnesandnoble', status: 'success' }],
+      '2026-09-15T00:00:00.000Z',
+    );
+
+    assert.deepEqual(observations, [{
+      source: 'barnesandnoble',
+      source_type: 'retail_listing',
+      source_listing_id: 'gid://shopify/Product/123',
+      product_id: '9781234567890',
+      name: 'Pokemon TCG Elite Trainer Box',
+      price: 49.99,
+      currency: 'USD',
+      availability: 'in_stock',
+      url: 'https://www.barnesandnoble.com/w/example/9781234567890',
+      observed_at: '2026-09-15T00:00:00.000Z',
+      confidence: 'verified',
+      source_status: 'success',
+      raw_status: 'in_stock',
+    }]);
   });
 });
