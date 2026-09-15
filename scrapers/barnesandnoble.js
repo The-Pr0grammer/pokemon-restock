@@ -57,6 +57,7 @@ const SEARCH_KEYWORDS = [
   'pokemon bundle box',
   'pokemon league battle deck',
 ];
+const KEYWORD_LIMIT = parseInt(process.env.BN_KEYWORD_LIMIT || String(SEARCH_KEYWORDS.length), 10);
 
 // ── HTTP ──────────────────────────────────────────────────────────────────────
 
@@ -204,7 +205,9 @@ async function scrapeBarnesAndNoble({ signal } = {}) {
   const seen      = new Set();
   let   bookCount = 0;
 
-  for (const keyword of SEARCH_KEYWORDS) {
+  const selectedKeywords = SEARCH_KEYWORDS.slice(0, KEYWORD_LIMIT);
+
+  for (const keyword of selectedKeywords) {
     throwIfAborted(signal);
     let results;
     try {
@@ -239,7 +242,7 @@ async function scrapeBarnesAndNoble({ signal } = {}) {
       `[B&N] "${keyword}": ${results.length} results → ${newCount} added, ${skipCount} skipped`,
     );
 
-    if (SEARCH_KEYWORDS.indexOf(keyword) < SEARCH_KEYWORDS.length - 1) await sleep(DELAY_MS, signal);
+    if (selectedKeywords.indexOf(keyword) < selectedKeywords.length - 1) await sleep(DELAY_MS, signal);
   }
 
   const inStock    = products.filter(p => p.stockStatus === 'in_stock').length;
