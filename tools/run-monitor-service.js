@@ -22,6 +22,10 @@ process.env.MSRP_SOURCE_TIMEOUT_MS = process.env.MSRP_SOURCE_TIMEOUT_MS || '1200
 process.env.BESTBUY_SOURCE_TIMEOUT_MS = process.env.BESTBUY_SOURCE_TIMEOUT_MS || '9000';
 process.env.BN_SOURCE_TIMEOUT_MS = process.env.BN_SOURCE_TIMEOUT_MS || '16000';
 process.env.REDDIT_SOURCE_TIMEOUT_MS = process.env.REDDIT_SOURCE_TIMEOUT_MS || '8000';
+process.env.MARKET_ENABLED = process.env.MARKET_ENABLED || 'true';
+process.env.MARKET_SOURCE_TIMEOUT_MS = process.env.MARKET_SOURCE_TIMEOUT_MS || '12000';
+process.env.MARKET_PRICE_TIMEOUT_MS = process.env.MARKET_PRICE_TIMEOUT_MS || '3000';
+process.env.MARKET_PRICE_MAX_OBSERVATIONS = process.env.MARKET_PRICE_MAX_OBSERVATIONS || '6';
 process.env.BESTBUY_HTML_TIMEOUT_MS = process.env.BESTBUY_HTML_TIMEOUT_MS || '8000';
 process.env.BESTBUY_HTML_MAX_ATTEMPTS = process.env.BESTBUY_HTML_MAX_ATTEMPTS || '1';
 
@@ -180,9 +184,17 @@ function openApiSpec(req) {
               type: 'array',
               items: { $ref: '#/components/schemas/Observation' },
             },
+            market_estimates: {
+              type: 'array',
+              items: { type: 'object' },
+            },
+            opportunity_candidates: {
+              type: 'array',
+              items: { type: 'object' },
+            },
             error: { type: 'string' },
           },
-          required: ['run_id', 'status', 'started_at', 'completed_at', 'duration_ms', 'sources', 'observations'],
+          required: ['run_id', 'status', 'started_at', 'completed_at', 'duration_ms', 'sources', 'observations', 'market_estimates', 'opportunity_candidates'],
         },
         ErrorResponse: {
           type: 'object',
@@ -212,6 +224,8 @@ async function executeRunMonitor() {
       duration_ms: Date.now() - t0,
       sources: sourcesFrom(result.sourceStatuses || []),
       observations: result.observations || [],
+      market_estimates: result.marketEstimates || [],
+      opportunity_candidates: result.opportunityCandidates || [],
     };
   } catch (err) {
     return {
@@ -222,6 +236,8 @@ async function executeRunMonitor() {
       duration_ms: Date.now() - t0,
       sources: [],
       observations: [],
+      market_estimates: [],
+      opportunity_candidates: [],
       error: err.message,
     };
   }

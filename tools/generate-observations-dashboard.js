@@ -5,6 +5,7 @@ const path = require('path');
 
 const inputPath = process.argv[2] || 'artifacts/restock-dry-run/observations.json';
 const outputPath = process.argv[3] || 'artifacts/restock-dry-run/dashboard.html';
+const candidatesPath = process.argv[4] || path.join(path.dirname(inputPath), 'opportunity-candidates.json');
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -30,7 +31,18 @@ function readObservations(filePath) {
 }
 
 const observations = readObservations(inputPath);
+const candidates = readObservations(candidatesPath);
 const generatedAt = new Date().toISOString();
+
+const candidateRows = candidates.map(candidate => `
+        <tr>
+          <td class="product"><a href="${escapeHtml(candidate.retail?.url)}">${escapeHtml(candidate.name || 'Unnamed product')}</a></td>
+          <td>${escapeHtml(formatPrice({ price: candidate.retail?.price, currency: candidate.retail?.currency }))}</td>
+          <td>${escapeHtml(formatPrice({ price: candidate.market?.estimate, currency: candidate.market?.currency }))}</td>
+          <td>${escapeHtml(candidate.math?.discount_pct ?? 'N/A')}%</td>
+          <td>${escapeHtml(candidate.market?.source || 'unknown')} (${escapeHtml(candidate.market?.evidence_count ?? 0)} sold)</td>
+          <td>${escapeHtml(candidate.confidence || 'unknown')}</td>
+        </tr>`).join('');
 
 const rows = observations.map(obs => `
         <tr>
@@ -81,6 +93,10 @@ const html = `<!doctype html>
       margin: 0 0 6px;
       font-size: 28px;
       line-height: 1.2;
+    }
+    h2 {
+      margin: 24px 0 10px;
+      font-size: 18px;
     }
     .meta {
       color: var(--muted);
@@ -162,7 +178,24 @@ const html = `<!doctype html>
       <h1>Restock Dry Run Dashboard</h1>
       <div class="meta">Generated ${escapeHtml(generatedAt)} from ${escapeHtml(path.basename(inputPath))}</div>
       <div class="summary"><strong>${observations.length}</strong> canonical observation${observations.length === 1 ? '' : 's'}</div>
+      <div class="summary"><strong>${candidates.length}</strong> opportunity candidate${candidates.length === 1 ? '' : 's'}</div>
     </header>
+    ${candidates.length ? `<h2>Opportunity Candidates</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Retail</th>
+          <th>Market Estimate</th>
+          <th>Discount</th>
+          <th>Evidence</th>
+          <th>Confidence</th>
+        </tr>
+      </thead>
+      <tbody>${candidateRows}
+      </tbody>
+    </table>` : ''}
+    <h2>Observations</h2>
     ${emptyState || `<table>
       <thead>
         <tr>

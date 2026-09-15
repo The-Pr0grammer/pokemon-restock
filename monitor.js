@@ -38,13 +38,18 @@ const redditMonitor   = require('./monitors/reddit');
 const notifierMod     = require('./notifier');
 const msrpMod         = require('./msrpChecker');
 const stateMod        = require('./stateManager');
+const marketMod       = require('./market/ebay-sold');
+const opportunityMod  = require('./opportunities');
 
 // ── Logging ───────────────────────────────────────────────────────────────────
 
 const DIVIDER = '━'.repeat(68);
 const SOURCE_STATUS_FILE = process.env.SOURCE_STATUS_FILE || '';
 const OBSERVATIONS_FILE = process.env.OBSERVATIONS_FILE || '';
+const MARKET_ESTIMATES_FILE = process.env.MARKET_ESTIMATES_FILE || '';
+const OPPORTUNITY_CANDIDATES_FILE = process.env.OPPORTUNITY_CANDIDATES_FILE || '';
 const OBSERVATION_SOURCE = process.env.OBSERVATION_SOURCE || 'barnesandnoble';
+const MARKET_ENABLED = process.env.MARKET_ENABLED !== 'false';
 const DEFAULT_SOURCE_BUDGET_MS = parseInt(process.env.SOURCE_TIMEOUT_MS || '30000', 10);
 
 const SOURCE_BUDGET_MS = {
@@ -57,6 +62,7 @@ const SOURCE_BUDGET_MS = {
   gamestop:            parseInt(process.env.GAMESTOP_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
   barnesandnoble:      parseInt(process.env.BN_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
   reddit:              parseInt(process.env.REDDIT_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  market:              parseInt(process.env.MARKET_SOURCE_TIMEOUT_MS || '12000', 10),
 };
 
 const log = {
@@ -180,6 +186,49 @@ function writeObservations(observations) {
   const path = require('path');
   fs.mkdirSync(path.dirname(OBSERVATIONS_FILE), { recursive: true });
   fs.writeFileSync(OBSERVATIONS_FILE, JSON.stringify(observations, null, 2));
+}
+
+function writeJsonFile(filePath, value) {
+  if (!filePath) return;
+  const fs = require('fs');
+  const path = require('path');
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
+}
+
+async function scanOpportunities(observations) {
+  if (!MARKET_ENABLED) {
+    return {
+      marketEstimates: [],
+      opportunityCandidates: [],
+      marketStatus: sourceStatus('market', 'disabled'),
+    };
+  }
+
+  const t0 = Date.now();
+  try {
+    const marketEstimates = await withSourceBudget('market', SOURCE_BUDGET_MS.market, ({ signal }) =>
+      marketMod.estimateMarketPrices(observations, { signal }),
+    );
+    const opportunityCandidates = opportunityMod.buildOpportunityCandidates(observations, marketEstimates);
+    return {
+      marketEstimates,
+      opportunityCandidates,
+      marketStatus: sourceStatus('market', 'success', {
+        elapsedMs: Date.now() - t0,
+        productCount: marketEstimates.length,
+      }),
+    };
+  } catch (err) {
+    return {
+      marketEstimates: [],
+      opportunityCandidates: [],
+      marketStatus: sourceStatus('market', classifyError(err), {
+        elapsedMs: Date.now() - t0,
+        message: err.message,
+      }),
+    };
+  }
 }
 
 // ── First-run detection ───────────────────────────────────────────────────────
@@ -554,13 +603,17 @@ async function run({ isDryRun = false, forceInit = false } = {}) {
   sourceStatuses.push(redditResult.status);
   const observations = buildCanonicalObservations(scraperResults, sourceStatuses, now);
   writeObservations(observations);
+  const { marketEstimates, opportunityCandidates, marketStatus } = await scanOpportunities(observations);
+  sourceStatuses.push(marketStatus);
+  writeJsonFile(MARKET_ESTIMATES_FILE, marketEstimates);
+  writeJsonFile(OPPORTUNITY_CANDIDATES_FILE, opportunityCandidates);
 
   if (initMode) {
     // [4] Baseline — mark all current products as "already seen"
     await runInit(scraperResults, ++phase, totalPhases);
     printSummary({ runStart, isDryRun, initMode: true, totalSeen: 0, allNew: [], allRestocked: [] });
     writeSourceStatuses(sourceStatuses);
-    return { initMode: true, newProducts: [], restockedProducts: [], sourceStatuses, observations };
+    return { initMode: true, newProducts: [], restockedProducts: [], sourceStatuses, observations, marketEstimates, opportunityCandidates };
   }
 
   // [4] Compare retailer results against stored state
@@ -587,7 +640,7 @@ async function run({ isDryRun = false, forceInit = false } = {}) {
   printSummary({ runStart, isDryRun, initMode: false, totalSeen, allNew, allRestocked });
   writeSourceStatuses(sourceStatuses);
 
-  return { initMode: false, newProducts: allNew, restockedProducts: allRestocked, sourceStatuses, observations };
+  return { initMode: false, newProducts: allNew, restockedProducts: allRestocked, sourceStatuses, observations, marketEstimates, opportunityCandidates };
 }
 
 // ── CLI entry point ───────────────────────────────────────────────────────────

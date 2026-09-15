@@ -159,6 +159,23 @@ POST /run_monitor
       "message": null
     }
   ],
+  "market_estimates": [
+    {
+      "product_id": "820650856952",
+      "source_listing_id": "9050817364209",
+      "market": {
+        "source": "ebay_sold",
+        "status": "insufficient_market_evidence",
+        "estimate": null,
+        "currency": "USD",
+        "evidence_count": 1,
+        "observed_at": "2026-09-15T00:00:20.000Z",
+        "query": "Pokemon Battle Academy Board Game",
+        "url": "https://www.ebay.com/sch/i.html?..."
+      }
+    }
+  ],
+  "opportunity_candidates": [],
   "observations": [
     {
       "source": "barnesandnoble",

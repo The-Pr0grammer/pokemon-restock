@@ -112,6 +112,8 @@ jobs:
             export MAX_PAGES="$DRY_RUN_MAX_PAGES"
             export SOURCE_STATUS_FILE="artifacts/restock-dry-run/source-statuses.json"
             export OBSERVATIONS_FILE="artifacts/restock-dry-run/observations.json"
+            export MARKET_ESTIMATES_FILE="artifacts/restock-dry-run/market-estimates.json"
+            export OPPORTUNITY_CANDIDATES_FILE="artifacts/restock-dry-run/opportunity-candidates.json"
             if [[ "$OBSERVATION_SOURCE" == "barnesandnoble" ]]; then
               export BN_ENABLED="true"
               export BN_KEYWORD_LIMIT="$BN_DRY_RUN_KEYWORD_LIMIT"
