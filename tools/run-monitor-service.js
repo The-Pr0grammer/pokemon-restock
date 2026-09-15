@@ -50,6 +50,9 @@ function sourcesFrom(statuses) {
 
 function publicBaseUrl(req) {
   if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+    return `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`;
+  }
   return `${req.protocol}://${req.get('host')}`;
 }
 
@@ -266,4 +269,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, executeRunMonitor, sourcesFrom };
+module.exports = { app, executeRunMonitor, sourcesFrom, openApiSpec, publicBaseUrl };

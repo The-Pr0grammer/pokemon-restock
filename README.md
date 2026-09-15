@@ -194,9 +194,10 @@ Environment:
 
 ```text
 RUN_MONITOR_TOKEN = <long random secret>
+PUBLIC_BASE_URL = https://pokemon-restock.onrender.com
 ```
 
-Render supplies `PORT`; do not commit or paste the bearer token into source control.
+Render supplies `PORT`; do not commit or paste the bearer token into source control. `PUBLIC_BASE_URL` keeps `/openapi.json` advertising the public HTTPS origin that ChatGPT Actions require.
 
 ChatGPT Action setup:
 
