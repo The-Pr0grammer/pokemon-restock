@@ -71,6 +71,7 @@ Prefer deriving this object in the dashboard generator from existing JSON artifa
 - Tooltips should expose exact counts/prices/statuses.
 - Never convert `investigate` into `opportunity` for visual simplicity.
 - Never label JustTCG `evidence_count` as sold comps; it currently represents market evidence/variant-price observations.
+- Do not expose Chart.js or dashboard rendering as a GPT Action. The GPT Action data interface remains `run_monitor` only.
 
 ## Implementation boundaries
 
@@ -78,6 +79,7 @@ Prefer deriving this object in the dashboard generator from existing JSON artifa
 - No new external market calls for visualization.
 - No chart should affect candidate scoring or procurement eligibility.
 - Visualization failure must not fail the monitor run; dashboard generation may report a warning and preserve the JSON artifacts.
+- The generated HTML dashboard is an artifact presentation layer; ChatGPT should summarize or visualize from the `run_monitor` JSON payload directly.
 
 ## Tests / acceptance
 

@@ -141,6 +141,8 @@ GET /openapi.json
 POST /run_monitor
 ```
 
+`GET /health` is for hosting checks only. `/openapi.json` intentionally advertises only `POST /run_monitor` to ChatGPT Actions.
+
 `POST /run_monitor` takes no body and no arbitrary command input. It executes the current safe Barnes & Noble dry-run observation slice, disables notifications, avoids state persistence, preserves source timeouts, and returns structured JSON:
 
 ```json
@@ -229,7 +231,7 @@ ChatGPT Action setup:
 https://pokemon-restock.onrender.com/openapi.json
 ```
 
-The action exposes one operation, `run_monitor`, which maps to `POST /run_monitor`.
+The action exposes one operation, `run_monitor`, which maps to `POST /run_monitor`. Do not add a Chart.js, dashboard-rendering, or health-check action. The GPT should use the returned JSON as its data interface and produce any conversational visual summary itself when the interface supports it. The generated Chart.js dashboard remains a downloadable artifact/report layer only.
 
 ---
 

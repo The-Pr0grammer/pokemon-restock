@@ -43,4 +43,10 @@ describe('run-monitor service OpenAPI server URL', () => {
     const spec = openApiSpec(makeReq('http', 'pokemon-restock.onrender.com'));
     assert.deepEqual(spec.servers, [{ url: 'https://pokemon-restock.onrender.com' }]);
   });
+
+  it('advertises only run_monitor as a GPT action', () => {
+    const spec = openApiSpec(makeReq());
+    assert.deepEqual(Object.keys(spec.paths), ['/run_monitor']);
+    assert.equal(spec.paths['/run_monitor'].post.operationId, 'run_monitor');
+  });
 });

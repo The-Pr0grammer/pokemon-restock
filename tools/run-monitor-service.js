@@ -74,22 +74,6 @@ function openApiSpec(req) {
     },
     servers: [{ url: publicBaseUrl(req) }],
     paths: {
-      '/health': {
-        get: {
-          operationId: 'health',
-          summary: 'Check service health without running the monitor',
-          responses: {
-            200: {
-              description: 'Service health status',
-              content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/HealthResponse' },
-                },
-              },
-            },
-          },
-        },
-      },
       '/run_monitor': {
         post: {
           operationId: 'run_monitor',
