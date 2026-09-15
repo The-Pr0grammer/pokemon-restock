@@ -53,7 +53,7 @@ const cheerio = require('cheerio');
 const fs      = require('fs');
 const path    = require('path');
 const config  = require('../config');
-const { withRetry, sleep } = require('../utils/retry');
+const { withRetry, sleep, throwIfAborted } = require('../utils/retry');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -106,12 +106,13 @@ function browserHeaders(extraHeaders = {}) {
  * Fetch a URL following redirects, returning status + finalUrl.
  * Used to detect when product pages redirect to queue-it.net.
  */
-async function fetchFollowingRedirects(url, extraHeaders = {}) {
+async function fetchFollowingRedirects(url, extraHeaders = {}, signal) {
   return withRetry(
     async () => {
       const res = await axios.get(url, {
         headers:         browserHeaders(extraHeaders),
         timeout:         REQUEST_TIMEOUT,
+        signal,
         maxRedirects:    10,
         decompress:      true,
         validateStatus:  () => true,  // never throw on HTTP errors
@@ -138,6 +139,7 @@ async function fetchFollowingRedirects(url, extraHeaders = {}) {
       onRetry(err, attempt, delayMs) {
         console.warn(`[PC] Retry ${attempt} for ${url}: ${err.message} — waiting ${delayMs / 1000}s`);
       },
+      signal,
     },
   );
 }
@@ -152,16 +154,17 @@ async function fetchFollowingRedirects(url, extraHeaders = {}) {
  * Queue-it's own infrastructure. Any other response (200, 302) indicates
  * a queue might be live for this customer.
  */
-async function pollQueueItDomains() {
+async function pollQueueItDomains(signal) {
   for (const cid of QUEUEIT_CUSTOMER_IDS) {
     const baseHost = `https://${cid}.${QUEUEIT_BASE}`;
 
     for (const probePath of QUEUEIT_PROBE_PATHS) {
+      throwIfAborted(signal);
       const url = baseHost + probePath.replace('{cid}', cid);
 
       let result;
       try {
-        result = await fetchFollowingRedirects(url);
+        result = await fetchFollowingRedirects(url, {}, signal);
       } catch (err) {
         console.warn(`[PC] Queue-it probe failed (${url}): ${err.message}`);
         continue;
@@ -194,7 +197,7 @@ async function pollQueueItDomains() {
       };
     }
 
-    await sleep(300);
+    await sleep(300, signal);
   }
 
   return null;
@@ -211,16 +214,17 @@ async function pollQueueItDomains() {
  * Also works in cookie mode: if we have valid cookies and the page embeds
  * Queue-it JavaScript config, we extract the event details from it.
  */
-async function checkProductPagesForQueue(watchUrls, cookie) {
+async function checkProductPagesForQueue(watchUrls, cookie, signal) {
   if (!watchUrls.length) return null;
 
   const headers = {};
   if (cookie) headers.Cookie = cookie;
 
   for (const productUrl of watchUrls) {
+    throwIfAborted(signal);
     let result;
     try {
-      result = await fetchFollowingRedirects(productUrl, headers);
+      result = await fetchFollowingRedirects(productUrl, headers, signal);
     } catch (err) {
       console.warn(`[PC] Product page check failed (${productUrl}): ${err.message}`);
       continue;
@@ -279,7 +283,7 @@ async function checkProductPagesForQueue(watchUrls, cookie) {
       }
     }
 
-    await sleep(500);
+    await sleep(500, signal);
   }
 
   return null;
@@ -566,19 +570,21 @@ function normalizeParsedProduct({ name, price, url, stockStatus }) {
   };
 }
 
-async function scrapeProductCatalog(cookie) {
+async function scrapeProductCatalog(cookie, signal) {
   const products  = [];
   const seen      = new Set();
   const headers   = { Cookie: cookie, Referer: PC_BASE + '/' };
 
   for (const categoryPath of PC_CATEGORIES) {
+    throwIfAborted(signal);
     let page = 1;
 
     while (page <= config.maxPages) {
+      throwIfAborted(signal);
       const url = `${PC_BASE}${categoryPath}?page=${page}`;
       let result;
       try {
-        result = await fetchFollowingRedirects(url, headers);
+        result = await fetchFollowingRedirects(url, headers, signal);
       } catch (err) {
         console.error(`[PC] Catalog fetch failed (${url}): ${err.message}`);
         break;
@@ -609,10 +615,10 @@ async function scrapeProductCatalog(cookie) {
 
       if (pageProducts.length < 20) break;  // last page
       page++;
-      await sleep(DELAY_MS);
+      await sleep(DELAY_MS, signal);
     }
 
-    await sleep(DELAY_MS * 2);
+    await sleep(DELAY_MS * 2, signal);
   }
 
   return products;
@@ -656,7 +662,7 @@ function isNewQueueEvent(queueEvent, history) {
 /**
  * Record a newly detected queue event. Returns whether it was new.
  */
-function recordQueueEvent(queueEvent) {
+function recordQueueEvent(queueEvent, { persist = true } = {}) {
   const history = loadQueueHistory();
   const isNew   = isNewQueueEvent(queueEvent, history);
 
@@ -669,14 +675,14 @@ function recordQueueEvent(queueEvent) {
     if (history.history.length > 100) history.history = history.history.slice(0, 100);
   }
 
-  saveQueueHistory(history);
+  if (persist) saveQueueHistory(history);
   return isNew;
 }
 
 /**
  * Mark the active queue as closed (call when we no longer detect it).
  */
-function closeActiveQueue() {
+function closeActiveQueue({ persist = true } = {}) {
   const history = loadQueueHistory();
   if (!history.activeQueue) return false;
 
@@ -688,14 +694,14 @@ function closeActiveQueue() {
 
   history.activeQueue = null;
   history.lastChecked = new Date().toISOString();
-  saveQueueHistory(history);
+  if (persist) saveQueueHistory(history);
   return true;
 }
 
-function recordCheckedTime() {
+function recordCheckedTime({ persist = true } = {}) {
   const history = loadQueueHistory();
   history.lastChecked = new Date().toISOString();
-  saveQueueHistory(history);
+  if (persist) saveQueueHistory(history);
 }
 
 // ── Main scraper ──────────────────────────────────────────────────────────────
@@ -709,7 +715,7 @@ function recordCheckedTime() {
  *   products:    object[],     — normalized Pokemon Center products ([] without cookie)
  * }}
  */
-async function scrapePokemonCenter() {
+async function scrapePokemonCenter({ signal, dryRun = false } = {}) {
   const pcCfg    = config.retailers.pokemoncenter;
   const cookie   = pcCfg.cookie || '';
   const watchUrls = pcCfg.watchUrls ?? [];
@@ -729,7 +735,7 @@ async function scrapePokemonCenter() {
   if (pcCfg.queuePing !== false) {
     console.log(`[PC] Polling Queue-it subdomains: ${QUEUEIT_CUSTOMER_IDS.join(', ')}`);
     try {
-      queueEvent = await pollQueueItDomains();
+      queueEvent = await pollQueueItDomains(signal);
     } catch (err) {
       console.error(`[PC] Queue-it poll error: ${err.message}`);
     }
@@ -739,7 +745,7 @@ async function scrapePokemonCenter() {
   if (!queueEvent && watchUrls.length) {
     console.log(`[PC] Checking ${watchUrls.length} watched product URL(s) for queue redirects`);
     try {
-      queueEvent = await checkProductPagesForQueue(watchUrls, cookie);
+      queueEvent = await checkProductPagesForQueue(watchUrls, cookie, signal);
     } catch (err) {
       console.error(`[PC] Product page queue check error: ${err.message}`);
     }
@@ -748,7 +754,7 @@ async function scrapePokemonCenter() {
   // Record result and determine if this is a new queue vs previously known
   let isNewQueue = false;
   if (queueEvent) {
-    isNewQueue = recordQueueEvent(queueEvent);
+    isNewQueue = recordQueueEvent(queueEvent, { persist: !dryRun });
     if (isNewQueue) {
       console.log(`[PC] ⚡ NEW queue detected via ${queueEvent.detectionMethod}!`);
       console.log(`[PC]    Customer: ${queueEvent.customerId}  Event: ${queueEvent.eventId ?? 'unknown'}`);
@@ -760,8 +766,8 @@ async function scrapePokemonCenter() {
     }
   } else {
     // No queue detected — close any previously recorded active queue
-    closeActiveQueue();
-    recordCheckedTime();
+    closeActiveQueue({ persist: !dryRun });
+    recordCheckedTime({ persist: !dryRun });
     console.log('[PC] No active queue detected');
   }
 
@@ -772,7 +778,7 @@ async function scrapePokemonCenter() {
   if (cookie) {
     console.log('[PC] Scraping product catalog…');
     try {
-      products = await scrapeProductCatalog(cookie);
+      products = await scrapeProductCatalog(cookie, signal);
 
       const inStock    = products.filter(p => p.stockStatus === 'in_stock').length;
       const outOfStock = products.filter(p => p.stockStatus === 'out_of_stock').length;

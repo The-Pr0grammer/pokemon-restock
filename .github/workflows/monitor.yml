@@ -71,6 +71,15 @@ jobs:
       SEARCH_KEYWORDS: ${{ vars.SEARCH_KEYWORDS }}
       FILTER_KEYWORDS: ${{ vars.FILTER_KEYWORDS }}
       MAX_PAGES:       ${{ vars.MAX_PAGES || '3' }}
+      DRY_RUN_MAX_PAGES: ${{ vars.DRY_RUN_MAX_PAGES || '1' }}
+      SOURCE_TIMEOUT_MS: ${{ vars.SOURCE_TIMEOUT_MS || '12000' }}
+      PC_QUEUE_SOURCE_TIMEOUT_MS: ${{ vars.PC_QUEUE_SOURCE_TIMEOUT_MS || '8000' }}
+      MSRP_SOURCE_TIMEOUT_MS: ${{ vars.MSRP_SOURCE_TIMEOUT_MS || '12000' }}
+      BESTBUY_SOURCE_TIMEOUT_MS: ${{ vars.BESTBUY_SOURCE_TIMEOUT_MS || '9000' }}
+      BN_SOURCE_TIMEOUT_MS: ${{ vars.BN_SOURCE_TIMEOUT_MS || '16000' }}
+      REDDIT_SOURCE_TIMEOUT_MS: ${{ vars.REDDIT_SOURCE_TIMEOUT_MS || '8000' }}
+      BESTBUY_HTML_TIMEOUT_MS: ${{ vars.BESTBUY_HTML_TIMEOUT_MS || '8000' }}
+      BESTBUY_HTML_MAX_ATTEMPTS: ${{ vars.BESTBUY_HTML_MAX_ATTEMPTS || '1' }}
 
     steps:
       - name: Checkout
@@ -98,6 +107,8 @@ jobs:
           fi
           if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
             FLAGS="$FLAGS --test"
+            export MAX_PAGES="$DRY_RUN_MAX_PAGES"
+            export SOURCE_STATUS_FILE="artifacts/restock-dry-run/source-statuses.json"
           fi
           node monitor.js $FLAGS 2>&1 | tee artifacts/restock-dry-run/monitor.log
 
@@ -105,9 +116,10 @@ jobs:
         if: ${{ always() && github.event.inputs.dry_run == 'true' }}
         run: |
           mkdir -p artifacts/restock-dry-run
-          git checkout -- data/pc-queue-history.json data/products.json data/msrp-database.json 2>/dev/null || true
-          rm -f data/reddit-seen.json
-          git status --short > artifacts/restock-dry-run/worktree-status-after-cleanup.txt
+          git restore --worktree --staged -- data/pc-queue-history.json data/products.json data/msrp-database.json 2>/dev/null || true
+          git clean -f -- data/reddit-seen.json 2>/dev/null || true
+          git status --short --untracked-files=all > artifacts/restock-dry-run/worktree-status-full.txt
+          grep -v '^?? artifacts/' artifacts/restock-dry-run/worktree-status-full.txt > artifacts/restock-dry-run/worktree-status-after-cleanup.txt || true
 
       - name: Upload dry-run artifact
         if: ${{ always() && github.event.inputs.dry_run == 'true' }}

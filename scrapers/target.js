@@ -21,7 +21,7 @@
 
 const axios = require('axios');
 const config = require('../config');
-const { withRetry, sleep } = require('../utils/retry');
+const { withRetry, sleep, throwIfAborted } = require('../utils/retry');
 
 // ── API config ─────────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ const BASE_PARAMS = {
   include_sponsored:            true,
 };
 
-async function fetchRedsky(params) {
+async function fetchRedsky(params, signal) {
   return withRetry(
     async () => {
       try {
@@ -76,6 +76,7 @@ async function fetchRedsky(params) {
           params:     { ...BASE_PARAMS, ...params },
           headers:    REQUEST_HEADERS,
           timeout:    22000,
+          signal,
           decompress: true,
         });
         return res.data;
@@ -106,13 +107,14 @@ async function fetchRedsky(params) {
       onRetry(err, attempt, delayMs) {
         console.warn(`[Target] Attempt ${attempt} failed (${err.message}), retrying in ${delayMs / 1000}s…`);
       },
+      signal,
     },
   );
 }
 
 // ── Paged fetch — returns all TCINs across pages ──────────────────────────────
 
-async function fetchAllTcins(purchasabilityFilter) {
+async function fetchAllTcins(purchasabilityFilter, signal) {
   const label = purchasabilityFilter ? 'in-stock' : 'all';
   const tcins = new Map(); // tcin → raw product object
   let offset = 0;
@@ -120,15 +122,20 @@ async function fetchAllTcins(purchasabilityFilter) {
   let page   = 0;
 
   while (offset < total && page < config.maxPages) {
+    throwIfAborted(signal);
     let data;
     try {
       data = await fetchRedsky({
         count: COUNT,
         offset,
         default_purchasability_filter: purchasabilityFilter,
-      });
+      }, signal);
     } catch (err) {
       console.error(`[Target] ${label} pass — page ${page + 1} failed: ${err.message}`);
+      if (page === 0) {
+        err.sourceStatus = err.response?.status === 435 || err.response?.status === 403 ? 'blocked' : err.sourceStatus;
+        throw err;
+      }
       break;
     }
 
@@ -151,7 +158,7 @@ async function fetchAllTcins(purchasabilityFilter) {
     offset  += COUNT;
     page    += 1;
 
-    if (offset < total && page < config.maxPages) await sleep(DELAY_MS);
+    if (offset < total && page < config.maxPages) await sleep(DELAY_MS, signal);
   }
 
   return tcins;
@@ -228,20 +235,20 @@ function normalizeProduct(raw, stockStatus) {
 
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
-async function scrapeTarget() {
+async function scrapeTarget({ signal } = {}) {
   console.log(`[Target] Starting — keyword: "${SEARCH_KEYWORD}"`);
 
   // Pass 1: all products (including OOS) — used to discover new listings
-  const allPass = await fetchAllTcins(false);
+  const allPass = await fetchAllTcins(false, signal);
   if (allPass.size === 0) {
     console.warn('[Target] All-products pass returned 0 items');
     return [];
   }
 
-  await sleep(DELAY_MS * 2); // pause between passes
+  await sleep(DELAY_MS * 2, signal); // pause between passes
 
   // Pass 2: purchasable items only — used to determine in_stock status
-  const inStockPass = await fetchAllTcins(true);
+  const inStockPass = await fetchAllTcins(true, signal);
   console.log(`[Target] Pass summary: ${allPass.size} total, ${inStockPass.size} in-stock`);
 
   const products        = [];

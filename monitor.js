@@ -42,6 +42,20 @@ const stateMod        = require('./stateManager');
 // ── Logging ───────────────────────────────────────────────────────────────────
 
 const DIVIDER = '━'.repeat(68);
+const SOURCE_STATUS_FILE = process.env.SOURCE_STATUS_FILE || '';
+const DEFAULT_SOURCE_BUDGET_MS = parseInt(process.env.SOURCE_TIMEOUT_MS || '30000', 10);
+
+const SOURCE_BUDGET_MS = {
+  pokemoncenter_queue: parseInt(process.env.PC_QUEUE_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  msrp:                parseInt(process.env.MSRP_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  target:              parseInt(process.env.TARGET_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  walmart:             parseInt(process.env.WALMART_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  bestbuy:             parseInt(process.env.BESTBUY_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  amazon:              parseInt(process.env.AMAZON_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  gamestop:            parseInt(process.env.GAMESTOP_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  barnesandnoble:      parseInt(process.env.BN_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  reddit:              parseInt(process.env.REDDIT_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+};
 
 const log = {
   divider: ()           => console.log(DIVIDER),
@@ -57,6 +71,59 @@ const log = {
 function elapsed(startMs) {
   const s = (Date.now() - startMs) / 1000;
   return s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+}
+
+function sourceStatus(source, status, details = {}) {
+  return {
+    source,
+    status,
+    productCount: details.productCount ?? 0,
+    elapsedMs: details.elapsedMs ?? null,
+    message: details.message ?? null,
+  };
+}
+
+function classifyError(err) {
+  if (err?.sourceStatus) return err.sourceStatus;
+  if (err?.code === 'SOURCE_TIMEOUT') return 'timeout';
+  if (err?.code === 'CREDENTIALS_MISSING') return 'credentials_missing';
+  if (err?.code === 'PARSER_STALE') return 'parser_stale';
+  if (err?.response?.status === 401 || err?.response?.status === 403) return 'blocked';
+  if (err?.response?.status === 429 || err?.response?.status === 435) return 'blocked';
+  if (err?.code === 'ECONNABORTED' || err?.code === 'ETIMEDOUT') return 'timeout';
+  return 'blocked';
+}
+
+async function withSourceBudget(source, budgetMs, fn) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    const err = new Error(`${source} exceeded ${budgetMs}ms source budget`);
+    err.code = 'SOURCE_TIMEOUT';
+    controller.abort(err);
+  }, budgetMs);
+
+  try {
+    return await fn({ signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      err.code = 'SOURCE_TIMEOUT';
+      err.sourceStatus = 'timeout';
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function writeSourceStatuses(statuses) {
+  if (!SOURCE_STATUS_FILE) return;
+  const fs = require('fs');
+  const path = require('path');
+  fs.mkdirSync(path.dirname(SOURCE_STATUS_FILE), { recursive: true });
+  fs.writeFileSync(SOURCE_STATUS_FILE, JSON.stringify({
+    generatedAt: new Date().toISOString(),
+    statuses,
+  }, null, 2));
 }
 
 // ── First-run detection ───────────────────────────────────────────────────────
@@ -75,12 +142,12 @@ function isFirstRun(state) {
 // fn is a thunk so it resolves through the module ref at call time, not import time.
 // This lets tests stub scraper functions without re-requiring monitor.
 const SCRAPERS = [
-  { key: 'target',          name: 'Target',          fn: () => targetScraper.scrapeTarget(),           cfg: () => config.retailers.target          },
-  { key: 'walmart',         name: 'Walmart',         fn: () => walmartScraper.scrapeWalmart(),         cfg: () => config.retailers.walmart         },
-  { key: 'bestbuy',         name: 'Best Buy',        fn: () => bestbuyScraper.scrapeBestBuy(),         cfg: () => config.retailers.bestbuy         },
-  { key: 'amazon',          name: 'Amazon',          fn: () => amazonScraper.scrapeAmazon(),           cfg: () => config.retailers.amazon          },
-  { key: 'gamestop',        name: 'GameStop',        fn: () => gamestopScraper.scrapeGameStop(),       cfg: () => config.retailers.gamestop        },
-  { key: 'barnesandnoble',  name: 'Barnes & Noble',  fn: () => bnScraper.scrapeBarnesAndNoble(),       cfg: () => config.retailers.barnesandnoble  },
+  { key: 'target',          name: 'Target',          fn: (opts) => targetScraper.scrapeTarget(opts),           cfg: () => config.retailers.target          },
+  { key: 'walmart',         name: 'Walmart',         fn: (opts) => walmartScraper.scrapeWalmart(opts),         cfg: () => config.retailers.walmart         },
+  { key: 'bestbuy',         name: 'Best Buy',        fn: (opts) => bestbuyScraper.scrapeBestBuy(opts),         cfg: () => config.retailers.bestbuy         },
+  { key: 'amazon',          name: 'Amazon',          fn: (opts) => amazonScraper.scrapeAmazon(opts),           cfg: () => config.retailers.amazon          },
+  { key: 'gamestop',        name: 'GameStop',        fn: (opts) => gamestopScraper.scrapeGameStop(opts),       cfg: () => config.retailers.gamestop        },
+  { key: 'barnesandnoble',  name: 'Barnes & Noble',  fn: (opts) => bnScraper.scrapeBarnesAndNoble(opts),       cfg: () => config.retailers.barnesandnoble  },
 ];
 
 // ── Phase 0: Pokemon Center queue check ──────────────────────────────────────
@@ -93,7 +160,7 @@ const SCRAPERS = [
 async function checkPokemonCenterQueue(phaseNum, totalPhases, isDryRun) {
   if (!config.retailers.pokemoncenter?.enabled) {
     log.phase(phaseNum, totalPhases, 'Pokemon Center queue check  [DISABLED — set PC_ENABLED=true to enable]');
-    return;
+    return sourceStatus('pokemoncenter_queue', 'disabled');
   }
 
   log.phase(phaseNum, totalPhases, 'Pokemon Center queue check');
@@ -101,10 +168,12 @@ async function checkPokemonCenterQueue(phaseNum, totalPhases, isDryRun) {
 
   let result;
   try {
-    result = await pcScraper.scrapePokemonCenter();
+    result = await withSourceBudget('pokemoncenter_queue', SOURCE_BUDGET_MS.pokemoncenter_queue, ({ signal }) =>
+      pcScraper.scrapePokemonCenter({ signal, dryRun: isDryRun }),
+    );
   } catch (err) {
     log.warn(`Queue check failed — ${err.message}`);
-    return;
+    return sourceStatus('pokemoncenter_queue', classifyError(err), { elapsedMs: Date.now() - t0, message: err.message });
   }
 
   const { queueEvent, isNewQueue, products } = result;
@@ -136,6 +205,8 @@ async function checkPokemonCenterQueue(phaseNum, totalPhases, isDryRun) {
   if (products?.length) {
     log.info(`PC catalog: ${products.length} product(s) scraped from Pokemon Center`);
   }
+
+  return sourceStatus('pokemoncenter_queue', 'success', { elapsedMs: Date.now() - t0, productCount: products?.length ?? 0 });
 }
 
 // ── Phase 1: MSRP refresh ─────────────────────────────────────────────────────
@@ -145,16 +216,18 @@ async function refreshMsrp(phaseNum, totalPhases) {
   const t0 = Date.now();
 
   try {
-    const db = await msrpMod.updateMsrpDatabase();
+    const db = await withSourceBudget('msrp', SOURCE_BUDGET_MS.msrp, ({ signal }) =>
+      msrpMod.updateMsrpDatabase(false, { signal }),
+    );
     const age = db.lastUpdated
       ? Math.round((Date.now() - new Date(db.lastUpdated).getTime()) / 1000 / 60)
       : null;
     const ageStr = age !== null ? ` · ${age < 60 ? age + 'm' : Math.round(age / 60) + 'h'} old` : '';
     log.ok(`${db.count} products${ageStr}  (${elapsed(t0)})`);
-    return db;
+    return { db, status: sourceStatus('msrp', 'success', { elapsedMs: Date.now() - t0, productCount: db.count }) };
   } catch (err) {
     log.warn(`Update failed — using stale cache. ${err.message}`);
-    return null;
+    return { db: null, status: sourceStatus('msrp', classifyError(err), { elapsedMs: Date.now() - t0, message: err.message }) };
   }
 }
 
@@ -172,26 +245,39 @@ async function scrapeRetailers(phaseNum, totalPhases) {
 
   if (!enabled.length) {
     log.warn('No retailers enabled — nothing to scrape.');
-    return [];
+    return disabled.map(s => ({ key: s.key, name: s.name, products: [], elapsedMs: 0, error: null, status: 'disabled' }));
   }
 
-  // Fire all enabled scrapers simultaneously
+  const results = [
+    ...disabled.map(s => ({ key: s.key, name: s.name, products: [], elapsedMs: 0, error: null, status: 'disabled' })),
+  ];
+
+  // Fire all enabled scrapers simultaneously, with a source-level time budget for each.
   const settled = await Promise.allSettled(
     enabled.map(({ key, name, fn }) => {
       const t0 = Date.now();
-      return fn()
-        .then(products => ({ key, name, products, elapsedMs: Date.now() - t0, error: null }))
-        .catch(err   => ({ key, name, products: [],  elapsedMs: Date.now() - t0, error: err }));
+      const cfg = config.retailers[key];
+      if (key === 'amazon' && (!cfg.accessKey || !cfg.secretKey || !cfg.partnerTag)) {
+        return Promise.resolve({
+          key, name, products: [], elapsedMs: Date.now() - t0, error: null, status: 'credentials_missing',
+          message: 'Missing AMAZON_ACCESS_KEY, AMAZON_SECRET_KEY, or AMAZON_PARTNER_TAG',
+        });
+      }
+      return withSourceBudget(key, SOURCE_BUDGET_MS[key], ({ signal }) => fn({ signal }))
+        .then(products => ({ key, name, products, elapsedMs: Date.now() - t0, error: null, status: 'success' }))
+        .catch(err   => ({ key, name, products: [],  elapsedMs: Date.now() - t0, error: err, status: classifyError(err), message: err.message }));
     }),
   );
 
-  const results = settled.map(s => s.value ?? s.reason);
+  results.push(...settled.map(s => s.value ?? s.reason));
 
   for (const r of results) {
-    if (r.error) {
-      log.error(`${r.name.padEnd(10)} failed — ${r.error.message}`);
+    if (r.status === 'disabled') {
+      continue;
+    } else if (r.status !== 'success') {
+      log.warn(`${r.name.padEnd(10)} ${r.status}${r.message ? ` — ${r.message}` : ''}  (${(r.elapsedMs / 1000).toFixed(1)}s)`);
     } else {
-      log.ok(`${r.name.padEnd(10)} ${r.products.length} product(s)  (${(r.elapsedMs / 1000).toFixed(1)}s)`);
+      log.ok(`${r.name.padEnd(10)} success · ${r.products.length} product(s)  (${(r.elapsedMs / 1000).toFixed(1)}s)`);
     }
   }
 
@@ -221,17 +307,20 @@ async function runInit(scraperResults, phaseNum, totalPhases) {
 
 // ── Reddit community alerts ───────────────────────────────────────────────────
 
-async function scrapeRedditAlerts(phaseNum, totalPhases) {
-  if (process.env.REDDIT_ENABLED === 'false') return [];
+async function scrapeRedditAlerts(phaseNum, totalPhases, isDryRun) {
+  if (process.env.REDDIT_ENABLED === 'false') return { posts: [], status: sourceStatus('reddit', 'disabled') };
+  const t0 = Date.now();
   try {
-    const posts = await redditMonitor.scrapeReddit();
+    const posts = await withSourceBudget('reddit', SOURCE_BUDGET_MS.reddit, ({ signal }) =>
+      redditMonitor.scrapeReddit({ signal, dryRun: isDryRun }),
+    );
     if (posts.length) {
       log.ok(`Reddit     ${posts.length} community alert(s)`);
     }
-    return posts;
+    return { posts, status: sourceStatus('reddit', 'success', { elapsedMs: Date.now() - t0, productCount: posts.length }) };
   } catch (err) {
     log.warn(`Reddit failed — ${err.message}`);
-    return [];
+    return { posts: [], status: sourceStatus('reddit', classifyError(err), { elapsedMs: Date.now() - t0, message: err.message }) };
   }
 }
 
@@ -245,8 +334,12 @@ function compareRetailers(scraperResults, state, phaseNum, totalPhases) {
   let   totalSeen    = 0;
 
   for (const r of scraperResults) {
+    if (r.status && r.status !== 'success') {
+      log.warn(`${r.name} — skipping comparison (${r.status})`);
+      continue;
+    }
     if (r.error) {
-      log.warn(`${r.name} — skipping comparison (scraper failed)`);
+      log.warn(`${r.name} — skipping comparison (${classifyError(r.error)})`);
       continue;
     }
 
@@ -382,22 +475,34 @@ async function run({ isDryRun = false, forceInit = false } = {}) {
   let   phase       = 0;
 
   // [1] Pokemon Center queue check — always first; fires critical alert if live
-  await checkPokemonCenterQueue(++phase, totalPhases, isDryRun);
+  const sourceStatuses = [];
+  sourceStatuses.push(await checkPokemonCenterQueue(++phase, totalPhases, isDryRun));
 
   // [2] MSRP database
-  await refreshMsrp(++phase, totalPhases);
+  const msrpResult = await refreshMsrp(++phase, totalPhases);
+  sourceStatuses.push(msrpResult.status);
 
   // [3] Scrape all enabled retailers + Reddit in parallel
-  const [scraperResults, redditAlerts] = await Promise.all([
+  const [scraperResults, redditResult] = await Promise.all([
     scrapeRetailers(++phase, totalPhases),
-    scrapeRedditAlerts(phase, totalPhases),  // runs alongside, logs its own output
+    scrapeRedditAlerts(phase, totalPhases, isDryRun),  // runs alongside, logs its own output
   ]);
+  const redditAlerts = redditResult.posts;
+  sourceStatuses.push(...scraperResults.map(r =>
+    sourceStatus(r.key, r.status ?? (r.error ? classifyError(r.error) : 'success'), {
+      productCount: r.products?.length ?? 0,
+      elapsedMs: r.elapsedMs,
+      message: r.message ?? r.error?.message ?? null,
+    }),
+  ));
+  sourceStatuses.push(redditResult.status);
 
   if (initMode) {
     // [4] Baseline — mark all current products as "already seen"
     await runInit(scraperResults, ++phase, totalPhases);
     printSummary({ runStart, isDryRun, initMode: true, totalSeen: 0, allNew: [], allRestocked: [] });
-    return { initMode: true, newProducts: [], restockedProducts: [] };
+    writeSourceStatuses(sourceStatuses);
+    return { initMode: true, newProducts: [], restockedProducts: [], sourceStatuses };
   }
 
   // [4] Compare retailer results against stored state
@@ -422,8 +527,9 @@ async function run({ isDryRun = false, forceInit = false } = {}) {
   persistState(state, ++phase, totalPhases, isDryRun);
 
   printSummary({ runStart, isDryRun, initMode: false, totalSeen, allNew, allRestocked });
+  writeSourceStatuses(sourceStatuses);
 
-  return { initMode: false, newProducts: allNew, restockedProducts: allRestocked };
+  return { initMode: false, newProducts: allNew, restockedProducts: allRestocked, sourceStatuses };
 }
 
 // ── CLI entry point ───────────────────────────────────────────────────────────
@@ -459,4 +565,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { run };
+module.exports = { run, classifyError, withSourceBudget };

@@ -25,7 +25,7 @@
 
 const axios = require('axios');
 const config = require('../config');
-const { withRetry, sleep } = require('../utils/retry');
+const { withRetry, sleep, throwIfAborted } = require('../utils/retry');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -63,10 +63,11 @@ const BASE_HEADERS = {
  * required to bypass Cloudflare bot detection on subsequent requests.
  * Returns a cookie string suitable for the Cookie header.
  */
-async function initSession() {
+async function initSession(signal) {
   const res = await axios.get(WALMART_BASE + '/', {
     headers: { ...BASE_HEADERS },
     timeout: 20000,
+    signal,
     maxRedirects: 5,
   });
 
@@ -81,13 +82,14 @@ async function initSession() {
   return cookies;
 }
 
-async function fetchPage(cookieStr, keyword, page) {
+async function fetchPage(cookieStr, keyword, page, signal) {
   return withRetry(
     async () => {
       const res = await axios.get(SEARCH_URL, {
         params:  { q: keyword, page },
         headers: { ...BASE_HEADERS, Referer: WALMART_BASE + '/', Cookie: cookieStr },
         timeout: 30000,
+        signal,
         decompress: true,
       });
       return res.data;
@@ -110,6 +112,7 @@ async function fetchPage(cookieStr, keyword, page) {
           console.warn(`[Walmart] Attempt ${attempt} failed (${err.message}) — retrying in ${delayMs / 1000}s…`);
         }
       },
+      signal,
     },
   );
 }
@@ -251,18 +254,19 @@ function normalizeItem(item) {
 
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
-async function scrapeWalmart() {
+async function scrapeWalmart({ signal } = {}) {
   console.log('[Walmart] Initialising session…');
   let cookies;
   try {
-    cookies = await initSession();
+    cookies = await initSession(signal);
     console.log('[Walmart] Session ready');
   } catch (err) {
     console.error(`[Walmart] Session init failed: ${err.message}`);
-    return [];
+    err.sourceStatus = err.code === 'SOURCE_TIMEOUT' ? 'timeout' : 'blocked';
+    throw err;
   }
 
-  await sleep(1000); // brief pause before first search
+  await sleep(1000, signal); // brief pause before first search
 
   const products        = [];
   const seen            = new Set();
@@ -275,17 +279,27 @@ async function scrapeWalmart() {
     console.log(`[Walmart] Searching: "${keyword}"`);
 
     while (page <= maxPage && page <= config.maxPages) {
+      throwIfAborted(signal);
       let html;
       try {
-        html = await fetchPage(cookies, keyword, page);
+        html = await fetchPage(cookies, keyword, page, signal);
       } catch (err) {
         console.error(`[Walmart] Fetch failed on "${keyword}" page ${page}: ${err.message}`);
+        if (page === 1 && products.length === 0) {
+          err.sourceStatus = err.response?.status === 429 ? 'blocked' : err.sourceStatus;
+          throw err;
+        }
         break;
       }
 
       const nextData = parseNextData(html);
       if (!nextData) {
         console.warn(`[Walmart] No __NEXT_DATA__ on "${keyword}" page ${page} — bot check may have triggered`);
+        if (page === 1 && products.length === 0) {
+          const err = new Error(`[Walmart] No __NEXT_DATA__ on first result page — bot check may have triggered`);
+          err.sourceStatus = 'blocked';
+          throw err;
+        }
         break;
       }
 
@@ -326,11 +340,11 @@ async function scrapeWalmart() {
       );
 
       page++;
-      if (page <= maxPage && page <= config.maxPages) await sleep(DELAY_MS);
+      if (page <= maxPage && page <= config.maxPages) await sleep(DELAY_MS, signal);
     }
 
     // Pause between keywords to reduce risk of rate-limiting
-    if (SEARCH_KEYWORDS.indexOf(keyword) < SEARCH_KEYWORDS.length - 1) await sleep(DELAY_MS * 2);
+    if (SEARCH_KEYWORDS.indexOf(keyword) < SEARCH_KEYWORDS.length - 1) await sleep(DELAY_MS * 2, signal);
   }
 
   const inStock    = products.filter(p => p.stockStatus === 'in_stock').length;

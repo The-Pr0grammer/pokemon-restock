@@ -32,7 +32,7 @@
 
 const axios  = require('axios');
 const config = require('../config');
-const { withRetry, sleep } = require('../utils/retry');
+const { withRetry, sleep, throwIfAborted } = require('../utils/retry');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ const BASE_HEADERS = {
   'Referer':         BN_BASE + '/',
 };
 
-async function fetchKeyword(keyword) {
+async function fetchKeyword(keyword, signal) {
   return withRetry(
     async () => {
       const res = await axios.get(SEARCH_API, {
@@ -79,6 +79,7 @@ async function fetchKeyword(keyword) {
         },
         headers: BASE_HEADERS,
         timeout: 20000,
+        signal,
       });
       return res.data?.results ?? [];
     },
@@ -96,6 +97,7 @@ async function fetchKeyword(keyword) {
       onRetry(err, attempt, delayMs) {
         console.warn(`[B&N] Attempt ${attempt} failed (${err.message}) — retrying in ${delayMs / 1000}s…`);
       },
+      signal,
     },
   );
 }
@@ -180,7 +182,7 @@ function normalizeResult(raw) {
 
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
-async function scrapeBarnesAndNoble() {
+async function scrapeBarnesAndNoble({ signal } = {}) {
   console.log('[B&N] Starting Pokemon TCG search via predictive-search API');
 
   const products  = [];
@@ -188,9 +190,10 @@ async function scrapeBarnesAndNoble() {
   let   bookCount = 0;
 
   for (const keyword of SEARCH_KEYWORDS) {
+    throwIfAborted(signal);
     let results;
     try {
-      results = await fetchKeyword(keyword);
+      results = await fetchKeyword(keyword, signal);
     } catch (err) {
       console.error(`[B&N] Failed on "${keyword}": ${err.message}`);
       continue;
@@ -221,7 +224,7 @@ async function scrapeBarnesAndNoble() {
       `[B&N] "${keyword}": ${results.length} results → ${newCount} added, ${skipCount} skipped`,
     );
 
-    if (SEARCH_KEYWORDS.indexOf(keyword) < SEARCH_KEYWORDS.length - 1) await sleep(DELAY_MS);
+    if (SEARCH_KEYWORDS.indexOf(keyword) < SEARCH_KEYWORDS.length - 1) await sleep(DELAY_MS, signal);
   }
 
   const inStock    = products.filter(p => p.stockStatus === 'in_stock').length;

@@ -26,7 +26,7 @@
 const axios   = require('axios');
 const cheerio = require('cheerio');
 const config  = require('../config');
-const { withRetry, sleep } = require('../utils/retry');
+const { withRetry, sleep, throwIfAborted } = require('../utils/retry');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -35,6 +35,8 @@ const HTML_BASE  = 'https://www.bestbuy.com';
 const PAGE_SIZE  = 100;  // max allowed by the Products API
 const DELAY_MS   = 1000;
 const MAX_RETRIES = 3;
+const HTML_FALLBACK_TIMEOUT_MS = parseInt(process.env.BESTBUY_HTML_TIMEOUT_MS || '8000', 10);
+const HTML_FALLBACK_MAX_ATTEMPTS = parseInt(process.env.BESTBUY_HTML_MAX_ATTEMPTS || '1', 10);
 
 // Fields requested from the Products API — extend here if more data is needed.
 const API_SHOW_FIELDS = [
@@ -81,7 +83,7 @@ function formatPrice(numeric) {
 
 // ── Mode 1: Official Products API ─────────────────────────────────────────────
 
-async function fetchApiPage(apiKey, query, page) {
+async function fetchApiPage(apiKey, query, page, signal) {
   return withRetry(
     async () => {
       try {
@@ -89,6 +91,7 @@ async function fetchApiPage(apiKey, query, page) {
           params:  { apiKey, format: 'json', pageSize: PAGE_SIZE, page, show: API_SHOW_FIELDS, sort: 'bestsellersRank.asc' },
           headers: { Accept: 'application/json' },
           timeout: 25000,
+          signal,
         });
         return res.data;
       } catch (err) {
@@ -118,6 +121,7 @@ async function fetchApiPage(apiKey, query, page) {
       onRetry(err, attempt, delayMs) {
         console.warn(`[Best Buy] API attempt ${attempt} failed (${err.message}) — retrying in ${delayMs / 1000}s…`);
       },
+      signal,
     },
   );
 }
@@ -155,7 +159,7 @@ function normalizeApiItem(item) {
   };
 }
 
-async function scrapeViaApi(apiKey) {
+async function scrapeViaApi(apiKey, signal) {
   const products = [];
   const seen     = new Set();
 
@@ -168,9 +172,10 @@ async function scrapeViaApi(apiKey) {
     console.log(`[Best Buy] API — searching: "${keyword}"`);
 
     while (currentPage <= totalPages && currentPage <= config.maxPages) {
+      throwIfAborted(signal);
       let data;
       try {
-        data = await fetchApiPage(apiKey, query, currentPage);
+        data = await fetchApiPage(apiKey, query, currentPage, signal);
       } catch (err) {
         console.error(`[Best Buy] API error on "${keyword}" page ${currentPage}: ${err.message}`);
         break;
@@ -210,11 +215,11 @@ async function scrapeViaApi(apiKey) {
       );
 
       currentPage++;
-      if (currentPage <= totalPages && currentPage <= config.maxPages) await sleep(DELAY_MS);
+      if (currentPage <= totalPages && currentPage <= config.maxPages) await sleep(DELAY_MS, signal);
     }
 
     const kwIdx = config.retailers.bestbuy.keywords.indexOf(keyword);
-    if (kwIdx < config.retailers.bestbuy.keywords.length - 1) await sleep(DELAY_MS * 2);
+    if (kwIdx < config.retailers.bestbuy.keywords.length - 1) await sleep(DELAY_MS * 2, signal);
   }
 
   return products;
@@ -222,20 +227,21 @@ async function scrapeViaApi(apiKey) {
 
 // ── Mode 2: HTML / Cheerio fallback ──────────────────────────────────────────
 
-async function fetchHtmlPage(keyword, page) {
+async function fetchHtmlPage(keyword, page, signal) {
   const url = `${HTML_BASE}/site/searchpage.jsp`;
   return withRetry(
     async () => {
       const res = await axios.get(url, {
         params:     { st: keyword, cp: page },
         headers:    { ...BASE_HEADERS, Referer: `${HTML_BASE}/` },
-        timeout:    30000,
+        timeout:    HTML_FALLBACK_TIMEOUT_MS,
+        signal,
         decompress: true,
       });
       return res.data;
     },
     {
-      maxAttempts: MAX_RETRIES,
+      maxAttempts: HTML_FALLBACK_MAX_ATTEMPTS,
       baseDelayMs: 2000,
       isRetryable(err) {
         const status = err.response?.status;
@@ -252,6 +258,7 @@ async function fetchHtmlPage(keyword, page) {
           console.warn(`[Best Buy] HTML attempt ${attempt} failed (${err.message}) — retrying in ${delayMs / 1000}s…`);
         }
       },
+      signal,
     },
   );
 }
@@ -333,23 +340,25 @@ function hasNextPage(html) {
   return $('a.sku-list-page-next, [data-testid="pagination-next"]:not([disabled])').length > 0;
 }
 
-async function scrapeViaHtml() {
+async function scrapeViaHtml(signal) {
   const products = [];
   const seen     = new Set();
 
-  console.log('[Best Buy] No API key — using HTML scraping fallback');
+  console.log(`[Best Buy] No API key — using capped HTML fallback (${HTML_FALLBACK_TIMEOUT_MS}ms, ${HTML_FALLBACK_MAX_ATTEMPTS} attempt)`);
 
-  for (const keyword of HTML_KEYWORDS) {
+  for (const keyword of HTML_KEYWORDS.slice(0, 1)) {
     let page = 1;
     console.log(`[Best Buy] HTML — searching: "${keyword}"`);
 
     while (page <= config.maxPages) {
+      throwIfAborted(signal);
       let html;
       try {
-        html = await fetchHtmlPage(keyword, page);
+        html = await fetchHtmlPage(keyword, page, signal);
       } catch (err) {
         console.error(`[Best Buy] HTML fetch failed on "${keyword}" page ${page}: ${err.message}`);
-        break;
+        err.sourceStatus = err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT' ? 'timeout' : 'blocked';
+        throw err;
       }
 
       const pageProducts = parseHtmlProducts(html, seen);
@@ -369,11 +378,11 @@ async function scrapeViaHtml() {
       if (!more || pageProducts.length === 0) break;
 
       page++;
-      await sleep(DELAY_MS * 2);  // be gentler without an API key
+      await sleep(DELAY_MS * 2, signal);  // be gentler without an API key
     }
 
     const kwIdx = HTML_KEYWORDS.indexOf(keyword);
-    if (kwIdx < HTML_KEYWORDS.length - 1) await sleep(DELAY_MS * 3);
+    if (kwIdx < HTML_KEYWORDS.length - 1) await sleep(DELAY_MS * 3, signal);
   }
 
   return products;
@@ -381,16 +390,16 @@ async function scrapeViaHtml() {
 
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
-async function scrapeBestBuy() {
+async function scrapeBestBuy({ signal } = {}) {
   const apiKey = config.retailers.bestbuy.apiKey;
 
   let products;
   if (apiKey) {
     console.log('[Best Buy] Starting — API mode');
-    products = await scrapeViaApi(apiKey);
+    products = await scrapeViaApi(apiKey, signal);
   } else {
     console.log('[Best Buy] Starting — HTML fallback mode (set BESTBUY_API_KEY for better results)');
-    products = await scrapeViaHtml();
+    products = await scrapeViaHtml(signal);
   }
 
   const inStock    = products.filter(p => p.stockStatus === 'in_stock').length;

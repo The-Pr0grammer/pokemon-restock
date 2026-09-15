@@ -1,5 +1,23 @@
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    const reason = signal.reason instanceof Error ? signal.reason : new Error('Operation aborted');
+    reason.code = reason.code || 'SOURCE_TIMEOUT';
+    throw reason;
+  }
+}
+
+function sleep(ms, signal) {
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    if (!signal) return;
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer);
+      const reason = signal.reason instanceof Error ? signal.reason : new Error('Operation aborted');
+      reason.code = reason.code || 'SOURCE_TIMEOUT';
+      reject(reason);
+    }, { once: true });
+  });
 }
 
 /**
@@ -14,25 +32,27 @@ function sleep(ms) {
  * @param {function(Error,number,number): void}  [opts.onRetry]   Called before each sleep
  */
 async function withRetry(fn, opts = {}) {
-  const { maxAttempts = 3, baseDelayMs = 1000, isRetryable, getDelay, onRetry } = opts;
+  const { maxAttempts = 3, baseDelayMs = 1000, isRetryable, getDelay, onRetry, signal } = opts;
   let lastErr;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    throwIfAborted(signal);
     try {
       return await fn(attempt);
     } catch (err) {
       lastErr = err;
       if (attempt >= maxAttempts) break;
+      throwIfAborted(signal);
       if (isRetryable && !isRetryable(err)) throw err;  // permanent error — rethrow immediately
       const delayMs = getDelay
         ? getDelay(err, attempt, baseDelayMs)
         : baseDelayMs * (2 ** (attempt - 1));            // 1×, 2×, 4× …
       onRetry?.(err, attempt, delayMs);
-      await sleep(delayMs);
+      await sleep(delayMs, signal);
     }
   }
 
   throw lastErr;
 }
 
-module.exports = { withRetry, sleep };
+module.exports = { withRetry, sleep, throwIfAborted };

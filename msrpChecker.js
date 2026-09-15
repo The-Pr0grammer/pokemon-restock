@@ -21,6 +21,7 @@ const cheerio = require('cheerio');
 const fs      = require('fs');
 const path    = require('path');
 const config  = require('./config');
+const { sleep, throwIfAborted } = require('./utils/retry');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -55,9 +56,10 @@ const PRODUCT_TYPE_GROUPS = [
 
 // ── Network ───────────────────────────────────────────────────────────────────
 
-async function fetchPage(url, retries = 3) {
+async function fetchPage(url, retries = 3, signal) {
   let lastErr;
   for (let attempt = 1; attempt <= retries; attempt++) {
+    throwIfAborted(signal);
     try {
       const res = await axios.get(url, {
         headers: {
@@ -66,6 +68,7 @@ async function fetchPage(url, retries = 3) {
           Referer: POKEMON_CENTER_BASE + '/',
         },
         timeout: 25000,
+        signal,
         // Decompress gzip/br automatically
         decompress: true,
       });
@@ -76,7 +79,7 @@ async function fetchPage(url, retries = 3) {
       if (attempt < retries) {
         const delay = 1500 * attempt;
         console.warn(`[MSRP] Fetch failed (attempt ${attempt}/${retries}) — retrying in ${delay}ms: ${err.message}`);
-        await sleep(delay);
+        await sleep(delay, signal);
       }
     }
   }
@@ -241,18 +244,19 @@ function extractProductsFromHtml(html) {
 
 // ── Pagination + Category Scraping ────────────────────────────────────────────
 
-async function scrapeCategory(categoryPath) {
+async function scrapeCategory(categoryPath, signal) {
   const products = [];
   const seen = new Set();
   let page = 1;
 
   while (true) {
+    throwIfAborted(signal);
     const url = `${POKEMON_CENTER_BASE}${categoryPath}?${PAGE_PARAM}=${page}`;
     console.log(`[MSRP] Fetching ${url}`);
 
     let html;
     try {
-      html = await fetchPage(url);
+      html = await fetchPage(url, 3, signal);
     } catch (err) {
       if (err.response?.status === 404) {
         console.warn(`[MSRP] Category not found (404): ${categoryPath}`);
@@ -288,20 +292,21 @@ async function scrapeCategory(categoryPath) {
     // Stop if this looks like the last page
     if (pageProducts.length < PAGE_SIZE) break;
     page++;
-    await sleep(1500); // polite crawl delay
+    await sleep(1500, signal); // polite crawl delay
   }
 
   return products;
 }
 
-async function scrapePokemonCenter() {
+async function scrapePokemonCenter(signal) {
   const all = [];
   const globalSeen = new Set();
 
   for (const categoryPath of TCG_CATEGORIES) {
+    throwIfAborted(signal);
     let categoryProducts;
     try {
-      categoryProducts = await scrapeCategory(categoryPath);
+      categoryProducts = await scrapeCategory(categoryPath, signal);
     } catch (err) {
       console.error(`[MSRP] Failed to scrape ${categoryPath}: ${err.message}`);
       continue;
@@ -315,7 +320,7 @@ async function scrapePokemonCenter() {
       }
     }
 
-    await sleep(2000); // pause between categories
+    await sleep(2000, signal); // pause between categories
   }
 
   return all;
@@ -414,7 +419,7 @@ function calculateSimilarity(queryName, candidateName) {
  * @param {boolean} force  If true, re-scrape even if the cache is fresh.
  * @returns {object} The database object { products, lastUpdated, count }.
  */
-async function updateMsrpDatabase(force = false) {
+async function updateMsrpDatabase(force = false, { signal } = {}) {
   const existing = loadDatabase();
 
   if (!force && !isDatabaseStale(existing) && existing.products.length > 0) {
@@ -423,7 +428,7 @@ async function updateMsrpDatabase(force = false) {
   }
 
   console.log('[MSRP] Scraping Pokemon Center for MSRP data…');
-  const products = await scrapePokemonCenter();
+  const products = await scrapePokemonCenter(signal);
 
   if (products.length === 0) {
     const msg =
@@ -432,12 +437,14 @@ async function updateMsrpDatabase(force = false) {
       'Check the selector strategies in extractProductsFromHtml() and ' +
       'the recursive search in findProductArraysInObject().';
     console.error(msg);
+    const err = new Error(msg);
+    err.code = 'PARSER_STALE';
     // Return stale data if we have it, rather than wiping the cache.
     if (existing.products.length > 0) {
       console.warn('[MSRP] Returning stale database to avoid data loss.');
       return existing;
     }
-    throw new Error(msg);
+    throw err;
   }
 
   const db = {
@@ -505,10 +512,6 @@ function findMsrp(productName, threshold = MIN_SIMILARITY) {
 
 function formatPrice(num) {
   return `$${Number(num).toFixed(2)}`;
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ── CLI ───────────────────────────────────────────────────────────────────────

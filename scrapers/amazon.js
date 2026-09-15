@@ -28,7 +28,7 @@
 const crypto = require('crypto');
 const axios  = require('axios');
 const config = require('../config');
-const { withRetry, sleep } = require('../utils/retry');
+const { withRetry, sleep, throwIfAborted } = require('../utils/retry');
 
 // ── API config ─────────────────────────────────────────────────────────────────
 
@@ -131,7 +131,7 @@ function buildSignedRequest(accessKey, secretKey, payload) {
 
 // ── HTTP ──────────────────────────────────────────────────────────────────────
 
-async function fetchSearchPage(accessKey, secretKey, partnerTag, keyword, itemPage) {
+async function fetchSearchPage(accessKey, secretKey, partnerTag, keyword, itemPage, signal) {
   const payload = {
     Keywords:    keyword,
     PartnerTag:  partnerTag,
@@ -151,6 +151,7 @@ async function fetchSearchPage(accessKey, secretKey, partnerTag, keyword, itemPa
         const res = await axios.post(`https://${PAAPI_HOST}${PAAPI_PATH}`, body, {
           headers,
           timeout: 20000,
+          signal,
         });
         return res.data;
       } catch (err) {
@@ -191,6 +192,7 @@ async function fetchSearchPage(accessKey, secretKey, partnerTag, keyword, itemPa
       onRetry(err, attempt, delayMs) {
         console.warn(`[Amazon] Attempt ${attempt} failed (${err.message}) — retrying in ${delayMs / 1000}s…`);
       },
+      signal,
     },
   );
 }
@@ -288,15 +290,13 @@ function normalizeItem(item, qualifyingListing, partnerTag) {
 
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
-async function scrapeAmazon() {
+async function scrapeAmazon({ signal } = {}) {
   const { accessKey, secretKey, partnerTag, fbaOnly } = config.retailers.amazon;
 
   if (!accessKey || !secretKey || !partnerTag) {
-    console.warn(
-      '[Amazon] Missing credentials — set AMAZON_ACCESS_KEY, AMAZON_SECRET_KEY, AMAZON_PARTNER_TAG.\n' +
-      '         Sign up free at https://affiliate-program.amazon.com',
-    );
-    return [];
+    const err = new Error('Missing AMAZON_ACCESS_KEY, AMAZON_SECRET_KEY, or AMAZON_PARTNER_TAG');
+    err.code = 'CREDENTIALS_MISSING';
+    throw err;
   }
 
   console.log(`[Amazon] Starting — seller filter: ${fbaOnly ? 'FBA/Prime-eligible' : 'Amazon.com only'}`);
@@ -311,9 +311,10 @@ async function scrapeAmazon() {
     console.log(`[Amazon] Searching: "${keyword}"`);
 
     while (page <= Math.min(totalPages, config.maxPages, 10)) {
+      throwIfAborted(signal);
       let data;
       try {
-        data = await fetchSearchPage(accessKey, secretKey, partnerTag, keyword, page);
+        data = await fetchSearchPage(accessKey, secretKey, partnerTag, keyword, page, signal);
       } catch (err) {
         console.error(`[Amazon] Fetch failed on "${keyword}" page ${page}: ${err.message}`);
         break;
@@ -358,11 +359,11 @@ async function scrapeAmazon() {
       );
 
       page++;
-      if (page <= Math.min(totalPages, config.maxPages, 10)) await sleep(DELAY_MS);
+      if (page <= Math.min(totalPages, config.maxPages, 10)) await sleep(DELAY_MS, signal);
     }
 
     const kwIdx = SEARCH_KEYWORDS.indexOf(keyword);
-    if (kwIdx < SEARCH_KEYWORDS.length - 1) await sleep(DELAY_MS * 2);
+    if (kwIdx < SEARCH_KEYWORDS.length - 1) await sleep(DELAY_MS * 2, signal);
   }
 
   const inStock    = products.filter(p => p.stockStatus === 'in_stock').length;

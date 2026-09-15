@@ -25,7 +25,7 @@
 const axios   = require('axios');
 const cheerio = require('cheerio');
 const config  = require('../config');
-const { withRetry, sleep } = require('../utils/retry');
+const { withRetry, sleep, throwIfAborted } = require('../utils/retry');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -74,17 +74,18 @@ const BASE_HEADERS = {
  * Fetch the GameStop homepage to establish session cookies required to bypass
  * bot detection on subsequent search requests.
  */
-async function initSession() {
+async function initSession(signal) {
   const res = await axios.get(GS_BASE + '/', {
     headers: BASE_HEADERS,
     timeout: 20000,
+    signal,
     maxRedirects: 5,
   });
   const cookies = (res.headers['set-cookie'] ?? []).map(c => c.split(';')[0]).join('; ');
   return cookies || null;
 }
 
-async function fetchPage(cookieStr, keyword, page) {
+async function fetchPage(cookieStr, keyword, page, signal) {
   return withRetry(
     async () => {
       const headers = {
@@ -103,6 +104,7 @@ async function fetchPage(cookieStr, keyword, page) {
         },
         headers,
         timeout: 30000,
+        signal,
         decompress: true,
       });
       return res.data;
@@ -122,6 +124,7 @@ async function fetchPage(cookieStr, keyword, page) {
       onRetry(err, attempt, delayMs) {
         console.warn(`[GameStop] Attempt ${attempt} failed (${err.message}) — retrying in ${delayMs / 1000}s…`);
       },
+      signal,
     },
   );
 }
@@ -305,17 +308,17 @@ function hasNextHtmlPage($) {
 
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
-async function scrapeGameStop() {
+async function scrapeGameStop({ signal } = {}) {
   console.log('[GameStop] Initialising session…');
   let cookies = null;
   try {
-    cookies = await initSession();
+    cookies = await initSession(signal);
     console.log(`[GameStop] Session ready${cookies ? '' : ' (no cookies — may hit bot check)'}`);
   } catch (err) {
     console.warn(`[GameStop] Session init failed (${err.message}) — continuing without cookies`);
   }
 
-  await sleep(1000);
+  await sleep(1000, signal);
   console.log('[GameStop] Starting Pokemon TCG search (New condition only)');
 
   const products = [];
@@ -327,9 +330,10 @@ async function scrapeGameStop() {
     console.log(`[GameStop] Searching: "${keyword}"`);
 
     while (hasMore && page <= config.maxPages) {
+      throwIfAborted(signal);
       let html;
       try {
-        html = await fetchPage(cookies, keyword, page);
+        html = await fetchPage(cookies, keyword, page, signal);
       } catch (err) {
         console.error(`[GameStop] Fetch failed on "${keyword}" page ${page}: ${err.message}`);
         break;
@@ -388,11 +392,11 @@ async function scrapeGameStop() {
       }
 
       page++;
-      if (hasMore && page <= config.maxPages) await sleep(DELAY_MS);
+      if (hasMore && page <= config.maxPages) await sleep(DELAY_MS, signal);
     }
 
     const kwIdx = SEARCH_KEYWORDS.indexOf(keyword);
-    if (kwIdx < SEARCH_KEYWORDS.length - 1) await sleep(DELAY_MS * 2);
+    if (kwIdx < SEARCH_KEYWORDS.length - 1) await sleep(DELAY_MS * 2, signal);
   }
 
   const inStock    = products.filter(p => p.stockStatus === 'in_stock').length;

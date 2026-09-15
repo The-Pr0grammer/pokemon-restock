@@ -27,6 +27,7 @@
 const fs    = require('fs');
 const path  = require('path');
 const axios = require('axios');
+const { sleep, throwIfAborted } = require('../utils/retry');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -80,12 +81,13 @@ const BASE_HEADERS = {
   'Accept':     'application/json',
 };
 
-async function fetchNewPosts(subreddit, limit = POST_LIMIT) {
+async function fetchNewPosts(subreddit, limit = POST_LIMIT, signal) {
   const url = `https://www.reddit.com/r/${subreddit}/new.json`;
   const res = await axios.get(url, {
     params:  { limit },
     headers: BASE_HEADERS,
     timeout: 20000,
+    signal,
   });
   return res.data?.data?.children?.map(c => c.data) ?? [];
 }
@@ -128,7 +130,8 @@ function loadSeenIds() {
   }
 }
 
-function saveSeenIds(seenSet) {
+function saveSeenIds(seenSet, { persist = true } = {}) {
+  if (!persist) return;
   const arr = [...seenSet].slice(-MAX_SEEN_IDS);
   fs.mkdirSync(path.dirname(SEEN_FILE), { recursive: true });
   fs.writeFileSync(SEEN_FILE, JSON.stringify({ seenIds: arr, lastUpdated: new Date().toISOString() }, null, 2));
@@ -163,7 +166,7 @@ function normalizePost(post) {
 
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
-async function scrapeReddit() {
+async function scrapeReddit({ signal, dryRun = false } = {}) {
   const enabled = process.env.REDDIT_ENABLED !== 'false';
   if (!enabled) {
     console.log('[Reddit] Disabled (REDDIT_ENABLED=false)');
@@ -180,15 +183,21 @@ async function scrapeReddit() {
   let   fetched  = 0;
   let   skipped  = 0;
   let   filtered = 0;
+  let   blocked  = false;
+  let   lastError = null;
 
   for (let i = 0; i < subreddits.length; i++) {
+    throwIfAborted(signal);
     const sub = subreddits[i];
 
     let posts;
     try {
-      posts = await fetchNewPosts(sub);
+      posts = await fetchNewPosts(sub, POST_LIMIT, signal);
     } catch (err) {
+      if (err.response?.status === 403 || err.response?.status === 429) err.sourceStatus = 'blocked';
       console.error(`[Reddit] Failed to fetch r/${sub}: ${err.message}`);
+      blocked = blocked || err.sourceStatus === 'blocked';
+      lastError = err;
       continue;
     }
 
@@ -205,23 +214,22 @@ async function scrapeReddit() {
 
     console.log(`[Reddit] r/${sub}: ${posts.length} posts fetched, ${matched.length} matched so far`);
 
-    if (i < subreddits.length - 1) await sleep(DELAY_MS);
+    if (i < subreddits.length - 1) await sleep(DELAY_MS, signal);
   }
 
-  saveSeenIds(seenIds);
+  saveSeenIds(seenIds, { persist: !dryRun });
 
   console.log(
     `[Reddit] Done: ${fetched} fetched, ${skipped} already seen, ` +
     `${filtered} filtered out, ${matched.length} new restock signals`,
   );
 
+  if (blocked && fetched === 0) {
+    lastError.sourceStatus = 'blocked';
+    throw lastError;
+  }
+
   return matched;
-}
-
-// ── Utilities ─────────────────────────────────────────────────────────────────
-
-function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
 }
 
 // ── CLI ───────────────────────────────────────────────────────────────────────

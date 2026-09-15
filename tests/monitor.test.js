@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const targetScraper  = require('../scrapers/target');
 const walmartScraper = require('../scrapers/walmart');
 const bestbuyScraper = require('../scrapers/bestbuy');
+const pcScraper      = require('../scrapers/pokemoncenter');
+const redditMonitor  = require('../monitors/reddit');
 const notifierMod    = require('../notifier');
 const msrpMod        = require('../msrpChecker');
 const stateMod       = require('../stateManager');
@@ -38,6 +40,8 @@ beforeEach(() => {
   targetScraper.scrapeTarget   = async () => [];
   walmartScraper.scrapeWalmart = async () => [];
   bestbuyScraper.scrapeBestBuy = async () => [];
+  pcScraper.scrapePokemonCenter = async () => ({ queueEvent: null, isNewQueue: false, products: [] });
+  redditMonitor.scrapeReddit    = async () => [];
   notifierMod.notify           = async () => ({});
   stateMod.loadState           = () => ({ version: 2, lastSaved: null });  // first run by default
   stateMod.saveState           = () => {};
