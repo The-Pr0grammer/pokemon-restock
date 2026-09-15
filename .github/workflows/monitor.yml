@@ -56,7 +56,7 @@ jobs:
       AMAZON_PARTNER_TAG:  ${{ secrets.AMAZON_PARTNER_TAG }}
       AMAZON_FBA_ONLY:     ${{ vars.AMAZON_FBA_ONLY     || 'false' }}
       GAMESTOP_ENABLED:    ${{ vars.GAMESTOP_ENABLED     || 'false' }}
-      BN_ENABLED:          ${{ vars.BN_ENABLED           || 'false' }}
+      BN_ENABLED:          ${{ vars.BN_ENABLED           || 'true' }}
       PC_ENABLED:          ${{ vars.PC_ENABLED           || 'true' }}
       PC_COOKIE:           ${{ secrets.PC_COOKIE }}
       PC_WATCH_URLS:       ${{ vars.PC_WATCH_URLS }}
@@ -118,7 +118,7 @@ jobs:
             export OBSERVATIONS_FILE="artifacts/restock-dry-run/observations.json"
             export MARKET_ESTIMATES_FILE="artifacts/restock-dry-run/market-estimates.json"
             export OPPORTUNITY_CANDIDATES_FILE="artifacts/restock-dry-run/opportunity-candidates.json"
-            if [[ "$OBSERVATION_SOURCE" == "barnesandnoble" ]]; then
+            if [[ "$OBSERVATION_SOURCE" == "barnesandnoble" || "$OBSERVATION_SOURCE" == "all" ]]; then
               export BN_ENABLED="true"
               export BN_KEYWORD_LIMIT="$BN_DRY_RUN_KEYWORD_LIMIT"
             fi
