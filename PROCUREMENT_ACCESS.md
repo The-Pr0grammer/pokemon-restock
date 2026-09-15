@@ -8,7 +8,7 @@ This repo treats retailer access as an explicit source-health concern. A source 
 | --- | --- | --- | --- |
 | Best Buy | Official Products API | Add `BESTBUY_API_KEY` | `credentials_missing` |
 | Amazon | Product Advertising API | Add `AMAZON_ACCESS_KEY`, `AMAZON_SECRET_KEY`, and `AMAZON_PARTNER_TAG` | `credentials_missing` |
-| JustTCG market data | JustTCG API | Add `JUSTTCG_API_KEY` | `credentials_missing` or market evidence unavailable |
+| JustTCG market data | JustTCG `/cards` search + batch API | Add `JUSTTCG_API_KEY` | `credentials_missing` or market evidence unavailable |
 | Pokemon Center inventory | Browser session-backed product pages | Add `PC_COOKIE` and `PC_WATCH_URLS` if product-page scraping is needed | queue probe can succeed; inventory parser may be `parser_stale` |
 | Target | Public structured frontend/API surface | Rediscover current browser-visible data route and update scraper fixtures | `blocked` or `parser_stale` |
 | Walmart | Public structured frontend/API surface | Rediscover current browser-visible XHR/GraphQL/JSON route and update scraper fixtures | `blocked` or `parser_stale` |
@@ -46,7 +46,11 @@ PC_ENABLED=true
 COSTCO_ENABLED=true
 SAMSCLUB_ENABLED=true
 MARKET_ENABLED=true
+JUSTTCG_BATCH_SIZE=20
+JUSTTCG_PRICE_HISTORY_DURATION=90d
 ```
+
+Keep `JUSTTCG_BATCH_SIZE=20` on the free tier. Raise it only after the account plan supports larger `/cards` POST batches.
 
 ### Maintenance-only knobs
 
@@ -59,7 +63,7 @@ Keep `BESTBUY_HTML_FALLBACK_ENABLED=false` in hosted production. Set it to `true
 ## Activation order
 
 1. Add `BESTBUY_API_KEY`, redeploy, and confirm Best Buy moves from `credentials_missing` to `success`, `no_matches`, `blocked`, or `credentials_invalid`.
-2. Add `JUSTTCG_API_KEY`, redeploy, and confirm `market-estimates.json` includes JustTCG attempts for eligible retail observations.
+2. Add `JUSTTCG_API_KEY`, redeploy, and confirm `market-estimates.json` includes JustTCG identity search attempts plus batched variant/history evidence for eligible retail observations.
 3. Add Amazon PA API credentials only after the Associates account and Product Advertising API access are approved.
 4. Add `PC_COOKIE` only if product-page inventory scraping is needed; queue probing remains separate.
 5. For Target, Walmart, Costco, Sam's Club, and GameStop, update collectors only after a browser-visible structured source is identified and fixture-backed tests prove the parser is healthy.

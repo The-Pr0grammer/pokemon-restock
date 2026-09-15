@@ -68,6 +68,8 @@ function buildSignal(observation, market, observedAt, signalType) {
       matched_product_id: market.matched_product_id ?? null,
       matched_product_name: market.matched_product_name ?? null,
       provenance: market.provenance ?? null,
+      evidence: market.evidence ?? null,
+      trend: market.trend ?? null,
       observed_at: market.observed_at,
       market_as_of: market.market_as_of ?? null,
       url: market.url,

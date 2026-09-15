@@ -30,6 +30,8 @@ describe('opportunity candidates', () => {
         estimate: 20,
         currency: 'USD',
         evidence_count: 5,
+        evidence: { variant_count: 5, price_history_points: 20 },
+        trend: { median_price_change_30d: 4.2 },
         observed_at: '2026-09-15T00:01:00.000Z',
         url: 'https://example.com/market',
       },
@@ -39,6 +41,8 @@ describe('opportunity candidates', () => {
     assert.equal(candidates[0].candidate_type, 'opportunity_candidate');
     assert.equal(candidates[0].math.absolute_spread, 16.05);
     assert.equal(candidates[0].math.discount_pct, 80.25);
+    assert.deepEqual(candidates[0].market.evidence, { variant_count: 5, price_history_points: 20 });
+    assert.deepEqual(candidates[0].market.trend, { median_price_change_30d: 4.2 });
   });
 
   it('demotes a price dislocation with weak identity and thin evidence to investigate', () => {
