@@ -126,11 +126,26 @@ function isPokemonProduct(name) {
 function isTcgProduct(raw) {
   const title = (raw?.product?.title ?? '').toLowerCase();
   const categories = (raw?.product?.categories ?? []).join(' ').toLowerCase();
+  const tcgSignals = [
+    'trading card',
+    'tcg',
+    'booster',
+    'elite trainer',
+    'etb',
+    ' tin',
+    'collection box',
+    'starter deck',
+    'battle deck',
+    'battle academy',
+    'blister',
+    'theme deck',
+  ];
+
+  if (!tcgSignals.some(s => title.includes(s))) return false;
 
   // B&N also sells Pokemon manga, novels, and art books — exclude those
   if (categories.includes('books') || categories.includes('media')) {
-    // Allow it only if the title strongly suggests a TCG product
-    const tcgSignals = ['trading card', 'booster', 'elite trainer', 'etb', ' tin', 'collection box', 'starter deck', 'battle deck', 'blister', 'theme deck'];
+    // Allow it only if the title strongly suggests a physical TCG product.
     return tcgSignals.some(s => title.includes(s));
   }
   return true;

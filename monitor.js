@@ -135,6 +135,15 @@ function availabilityFromProduct(product) {
   return 'unknown';
 }
 
+function canonicalUrl(product) {
+  if (!product.url) return null;
+  if (/^https?:\/\//i.test(product.url)) return product.url;
+  if (product.retailer === 'barnesandnoble' && product.url.startsWith('/')) {
+    return `https://www.barnesandnoble.com${product.url}`;
+  }
+  return product.url;
+}
+
 function canonicalObservation(product, sourceStatusEntry, observedAt) {
   const source = product.retailer || sourceStatusEntry?.source || OBSERVATION_SOURCE;
   const sourceListingId = product.shopifyId || product.tcin || product.sku || product.asin || product.ean || product.id || null;
@@ -149,7 +158,7 @@ function canonicalObservation(product, sourceStatusEntry, observedAt) {
     price: Number.isFinite(product.priceNumeric) ? product.priceNumeric : null,
     currency: product.priceNumeric != null ? 'USD' : null,
     availability: availabilityFromProduct(product),
-    url: product.url || null,
+    url: canonicalUrl(product),
     observed_at: observedAt,
     confidence: sourceStatusEntry?.status === 'success' ? 'verified' : 'unverified',
     source_status: sourceStatusEntry?.status || 'unknown',

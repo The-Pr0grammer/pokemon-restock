@@ -212,7 +212,7 @@ describe('monitor observations artifact', () => {
           shopifyId: 'gid://shopify/Product/123',
           name: 'Pokemon TCG Elite Trainer Box',
           priceNumeric: 49.99,
-          url: 'https://www.barnesandnoble.com/w/example/9781234567890',
+          url: '/w/example/9781234567890',
           inStock: true,
           stockStatus: 'in_stock',
         }],
