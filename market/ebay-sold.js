@@ -160,4 +160,5 @@ module.exports = {
   extractSoldPrices,
   isRelevantSoldTitle,
   parsePrice,
+  marketErrorStatus,
 };

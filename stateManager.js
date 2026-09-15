@@ -138,6 +138,14 @@ function evaluateForNotification(product) {
   }
 
   const msrpData = msrpChecker.findMsrp(product.name);
+  if (
+    msrpData?.msrp != null &&
+    Number.isFinite(product.priceNumeric) &&
+    product.priceNumeric > msrpData.msrp * 1.2
+  ) {
+    return { notify: false, msrp: msrpData };
+  }
+
   return { notify: true, msrp: msrpData ?? null };
 }
 

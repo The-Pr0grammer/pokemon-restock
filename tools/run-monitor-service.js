@@ -13,7 +13,7 @@ process.env.BESTBUY_ENABLED = process.env.BESTBUY_ENABLED || 'true';
 process.env.AMAZON_ENABLED = process.env.AMAZON_ENABLED || 'true';
 process.env.GAMESTOP_ENABLED = 'false';
 process.env.BN_ENABLED = 'true';
-process.env.OBSERVATION_SOURCE = 'barnesandnoble';
+process.env.OBSERVATION_SOURCE = process.env.OBSERVATION_SOURCE || 'all';
 process.env.MAX_PAGES = process.env.DRY_RUN_MAX_PAGES || '1';
 process.env.BN_KEYWORD_LIMIT = process.env.BN_DRY_RUN_KEYWORD_LIMIT || '6';
 process.env.SOURCE_TIMEOUT_MS = process.env.SOURCE_TIMEOUT_MS || '12000';
@@ -25,7 +25,7 @@ process.env.REDDIT_SOURCE_TIMEOUT_MS = process.env.REDDIT_SOURCE_TIMEOUT_MS || '
 process.env.MARKET_ENABLED = process.env.MARKET_ENABLED || 'true';
 process.env.MARKET_SOURCE_TIMEOUT_MS = process.env.MARKET_SOURCE_TIMEOUT_MS || '12000';
 process.env.MARKET_PRICE_TIMEOUT_MS = process.env.MARKET_PRICE_TIMEOUT_MS || '3000';
-process.env.MARKET_PRICE_MAX_OBSERVATIONS = process.env.MARKET_PRICE_MAX_OBSERVATIONS || '6';
+process.env.MARKET_PRICE_MAX_OBSERVATIONS = process.env.MARKET_PRICE_MAX_OBSERVATIONS || '12';
 process.env.BESTBUY_HTML_TIMEOUT_MS = process.env.BESTBUY_HTML_TIMEOUT_MS || '8000';
 process.env.BESTBUY_HTML_MAX_ATTEMPTS = process.env.BESTBUY_HTML_MAX_ATTEMPTS || '1';
 
@@ -66,7 +66,7 @@ function openApiSpec(req) {
     info: {
       title: 'Pokemon Restock Monitor',
       version: '0.1.0',
-      description: 'Runs the safe Pokemon restock monitor dry-run and returns source statuses plus canonical observations.',
+      description: 'Runs the safe Pokemon opportunity sweep and returns source statuses, canonical observations, market estimates, and opportunity candidates.',
     },
     servers: [{ url: publicBaseUrl(req) }],
     paths: {
@@ -90,7 +90,7 @@ function openApiSpec(req) {
         post: {
           operationId: 'run_monitor',
           summary: 'Run the safe Pokemon restock monitor dry-run',
-          description: 'Runs the Barnes & Noble observation slice with notifications disabled and no persistent state mutation.',
+          description: 'Runs a broad read-only retail observation sweep with notifications disabled and no persistent state mutation, then enriches verified direct listings with independent market evidence.',
           security: [{ bearerAuth: [] }],
           responses: {
             200: {
@@ -163,10 +163,11 @@ function openApiSpec(req) {
             url: { type: ['string', 'null'] },
             observed_at: { type: 'string' },
             confidence: { type: 'string' },
+            verification_state: { type: 'string' },
             source_status: { type: 'string' },
             raw_status: { type: ['string', 'null'] },
           },
-          required: ['source', 'source_type', 'source_listing_id', 'product_id', 'name', 'price', 'currency', 'availability', 'url', 'observed_at', 'confidence', 'source_status', 'raw_status'],
+          required: ['source', 'source_type', 'source_listing_id', 'product_id', 'name', 'price', 'currency', 'availability', 'url', 'observed_at', 'confidence', 'verification_state', 'source_status', 'raw_status'],
         },
         RunMonitorResponse: {
           type: 'object',

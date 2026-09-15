@@ -233,6 +233,7 @@ describe('monitor observations artifact', () => {
       url: 'https://www.barnesandnoble.com/w/example/9781234567890',
       observed_at: '2026-09-15T00:00:00.000Z',
       confidence: 'verified',
+      verification_state: 'direct_product_page',
       source_status: 'success',
       raw_status: 'in_stock',
     }]);
