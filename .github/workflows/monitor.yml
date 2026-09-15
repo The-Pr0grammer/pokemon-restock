@@ -55,7 +55,7 @@ jobs:
       AMAZON_SECRET_KEY:   ${{ secrets.AMAZON_SECRET_KEY }}
       AMAZON_PARTNER_TAG:  ${{ secrets.AMAZON_PARTNER_TAG }}
       AMAZON_FBA_ONLY:     ${{ vars.AMAZON_FBA_ONLY     || 'false' }}
-      GAMESTOP_ENABLED:    ${{ vars.GAMESTOP_ENABLED     || 'false' }}
+      GAMESTOP_ENABLED:    ${{ vars.GAMESTOP_ENABLED     || 'true' }}
       BN_ENABLED:          ${{ vars.BN_ENABLED           || 'true' }}
       COSTCO_ENABLED:      ${{ vars.COSTCO_ENABLED       || 'true' }}
       SAMSCLUB_ENABLED:    ${{ vars.SAMSCLUB_ENABLED     || 'true' }}

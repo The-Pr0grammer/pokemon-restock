@@ -68,10 +68,7 @@ module.exports = {
       fbaOnly:    process.env.AMAZON_FBA_ONLY === 'true',
     },
     gamestop: {
-      // Disabled by default: GameStop uses Cloudflare Enterprise which blocks server-side
-      // HTTP requests (GitHub Actions, VPS, etc.). Enable only if you have a residential
-      // proxy configured or are running monitor.js locally from a home IP.
-      enabled: process.env.GAMESTOP_ENABLED === 'true',
+      enabled: process.env.GAMESTOP_ENABLED !== 'false',
       name:    'GameStop',
       color:   0xe31837,
       keywords,

@@ -181,10 +181,10 @@ describe('monitor.run — scraper error resilience', () => {
     let compareCallCount = 0;
     stateMod.compareAndUpdate = () => { compareCallCount++; return { newProducts: [], restockedProducts: [] }; };
 
-    // Should not throw; should still process walmart, bestbuy, and B&N
+    // Should not throw; should still process walmart, bestbuy, GameStop, and B&N
     await assert.doesNotReject(() => run({ isDryRun: true, forceInit: false }));
     // Target failed, so compareAndUpdate only called for successful retailers.
-    assert.equal(compareCallCount, 3);
+    assert.equal(compareCallCount, 4);
   });
 
   it('returns empty results when all scrapers fail', async () => {

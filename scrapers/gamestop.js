@@ -43,6 +43,37 @@ const SEARCH_KEYWORDS = [
   'pokemon elite trainer box',
 ];
 
+const TCG_SIGNALS = [
+  'trading card',
+  'tcg',
+  'booster',
+  'elite trainer',
+  'etb',
+  'collection',
+  'battle academy',
+  'trainer box',
+  'tin',
+  'ex box',
+];
+
+const NON_TCG_SIGNALS = [
+  'plush',
+  'figure',
+  'funko',
+  'shirt',
+  'hoodie',
+  'hat',
+  'backpack',
+  'book',
+  'manga',
+  'game',
+  'nintendo switch',
+  'scarlet',
+  'violet',
+  'legends',
+  'phone case',
+];
+
 // ── HTML selectors — update if GameStop redesigns ─────────────────────────────
 // Inspect https://www.gamestop.com/search/?q=pokemon in DevTools if these break.
 const SEL = {
@@ -207,6 +238,13 @@ function isPokemonProduct(name) {
   return lower.includes('pokemon') || lower.includes('pokémon');
 }
 
+function isPokemonTcgProduct(name, details = '') {
+  const text = `${name} ${details}`.toLowerCase();
+  if (!isPokemonProduct(text)) return false;
+  if (TCG_SIGNALS.some(signal => text.includes(signal))) return true;
+  return !NON_TCG_SIGNALS.some(signal => text.includes(signal));
+}
+
 function isNewCondition(raw) {
   const cond = (raw.condition ?? raw.productCondition ?? '').toLowerCase();
   return !cond || cond === 'new';  // absent condition field → assume new (searching with condition=new param)
@@ -224,15 +262,75 @@ function parsePriceText(text) {
   return isNaN(num) ? null : num;
 }
 
+function firstNumericPrice(...values) {
+  for (const value of values) {
+    if (value == null || value === '') continue;
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'object') {
+      const nested = firstNumericPrice(value.value, value.price, value.amount, value.displayValue, value.formatted);
+      if (nested != null) return nested;
+      continue;
+    }
+    const parsed = parsePriceText(String(value));
+    if (parsed != null) return parsed;
+  }
+  return null;
+}
+
+function extractJsonPrices(raw) {
+  const publicPrice = firstNumericPrice(
+    raw.price,
+    raw.salePrice,
+    raw.currentPrice,
+    raw.priceInfo?.currentPrice,
+    raw.priceInfo?.salePrice,
+    raw.priceInfo?.linePrice,
+  );
+  const memberPrice = firstNumericPrice(
+    raw.proPrice,
+    raw.memberPrice,
+    raw.powerUpRewardsPrice,
+    raw.priceInfo?.proPrice,
+    raw.priceInfo?.memberPrice,
+    raw.promotions?.find?.(promo => /pro|member/i.test(String(promo?.name || promo?.title || '')))?.price,
+  );
+  const regularPrice = firstNumericPrice(
+    raw.basePrice,
+    raw.originalPrice,
+    raw.listPrice,
+    raw.msrp,
+    raw.priceInfo?.originalPrice,
+    raw.priceInfo?.listPrice,
+  );
+
+  return { publicPrice, memberPrice, regularPrice };
+}
+
+function extractHtmlPrices($, $item) {
+  const text = $item.text().replace(/\s+/g, ' ');
+  const proMatch = text.match(/(?:pro|member)\s*(?:price)?\s*\$?\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const wasMatch = text.match(/(?:was|reg(?:ular)?\.?|list)\s*\$?\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const publicPrice = parsePriceText($item.find(SEL.price).first().text().trim());
+  return {
+    publicPrice,
+    memberPrice: proMatch ? Number(proMatch[1]) : null,
+    regularPrice: wasMatch ? Number(wasMatch[1]) : null,
+  };
+}
+
+function formatPrice(value) {
+  return value != null && Number.isFinite(value) ? `$${value.toFixed(2)}` : null;
+}
+
 function normalizeJsonProduct(raw) {
   const sku         = String(raw.id ?? raw.sku ?? raw.productId ?? '');
   const name        = raw.productName ?? raw.name ?? raw.title ?? '';
+  const details     = raw.description ?? raw.shortDescription ?? '';
   const stockStatus = getStockStatusFromJson(raw);
 
-  const priceRaw    = raw.price ?? raw.salePrice ?? raw.currentPrice ?? null;
-  const priceNumeric = priceRaw != null ? Number(priceRaw) : null;
-  const regRaw      = raw.basePrice ?? raw.originalPrice ?? raw.msrp ?? null;
-  const regNumeric  = regRaw != null && Number(regRaw) !== priceNumeric ? Number(regRaw) : null;
+  const prices = extractJsonPrices(raw);
+  const priceNumeric = prices.publicPrice ?? prices.memberPrice;
+  const regNumeric = prices.regularPrice != null && prices.regularPrice !== priceNumeric ? prices.regularPrice : null;
 
   const urlPath = raw.url ?? raw.productUrl ?? '';
   const url     = urlPath.startsWith('http') ? urlPath : `${GS_BASE}${urlPath}`;
@@ -245,12 +343,28 @@ function normalizeJsonProduct(raw) {
     brand:        raw.brand ?? raw.manufacturer ?? null,
     price:        priceNumeric != null ? `$${priceNumeric.toFixed(2)}` : 'N/A',
     priceNumeric,
-    regularPrice: regNumeric != null ? `$${regNumeric.toFixed(2)}` : null,
+    regularPrice: formatPrice(regNumeric),
+    publicPrice:  prices.publicPrice,
+    memberPrice:  prices.memberPrice,
+    sellerName:   'GameStop',
+    sellerType:   'first_party',
     url,
     inStock:      stockStatus === 'in_stock',
     stockStatus,
     releaseDate:  raw.releaseDate ?? raw.streetDate ?? null,
+    productKind:  inferProductKind(name, details),
   };
+}
+
+function inferProductKind(name, details = '') {
+  const text = `${name} ${details}`.toLowerCase();
+  if (/elite trainer|\betb\b/.test(text)) return 'ETB';
+  if (/booster box/.test(text)) return 'BOOSTER_BOX';
+  if (/booster bundle/.test(text)) return 'BOOSTER_BUNDLE';
+  if (/booster pack/.test(text)) return 'BOOSTER_PACK';
+  if (/\btins?\b/.test(text)) return 'TIN';
+  if (/collection|ex box|premium/i.test(text)) return 'COLLECTION';
+  return 'TCG_PRODUCT';
 }
 
 function parseHtmlProducts(html, seen) {
@@ -268,7 +382,7 @@ function parseHtmlProducts(html, seen) {
     const name    = titleEl.text().trim();
     const href    = titleEl.attr('href') ?? '';
 
-    if (!name || !isPokemonProduct(name)) return;
+    if (!name || !isPokemonTcgProduct(name, $item.text())) return;
 
     // Extract SKU from URL or data attribute
     const sku = extractSkuFromUrl(href)
@@ -278,8 +392,9 @@ function parseHtmlProducts(html, seen) {
     if (!sku || seen.has(sku)) return;
     seen.add(sku);
 
-    const priceText   = $item.find(SEL.price).first().text().trim();
-    const priceNumeric = parsePriceText(priceText);
+    const prices = extractHtmlPrices($, $item);
+    const priceNumeric = prices.publicPrice ?? prices.memberPrice;
+    const regNumeric = prices.regularPrice != null && prices.regularPrice !== priceNumeric ? prices.regularPrice : null;
     const stockStatus  = getStockStatusFromHtml($, $item);
     const url          = href.startsWith('http') ? href : `${GS_BASE}${href}`;
 
@@ -291,11 +406,16 @@ function parseHtmlProducts(html, seen) {
       brand:        null,
       price:        priceNumeric != null ? `$${priceNumeric.toFixed(2)}` : 'N/A',
       priceNumeric,
-      regularPrice: null,
+      regularPrice: formatPrice(regNumeric),
+      publicPrice:  prices.publicPrice,
+      memberPrice:  prices.memberPrice,
+      sellerName:   'GameStop',
+      sellerType:   'first_party',
       url,
       inStock:      stockStatus === 'in_stock',
       stockStatus,
       releaseDate:  null,
+      productKind:  inferProductKind(name, $item.text()),
     });
   });
 
@@ -323,6 +443,8 @@ async function scrapeGameStop({ signal } = {}) {
 
   const products = [];
   const seen     = new Set();
+  let fetchFailures = 0;
+  let parsedPages = 0;
 
   for (const keyword of SEARCH_KEYWORDS) {
     let page    = 1;
@@ -336,8 +458,10 @@ async function scrapeGameStop({ signal } = {}) {
         html = await fetchPage(cookies, keyword, page, signal);
       } catch (err) {
         console.error(`[GameStop] Fetch failed on "${keyword}" page ${page}: ${err.message}`);
+        fetchFailures++;
         break;
       }
+      parsedPages++;
 
       // Strategy 1: __NEXT_DATA__ JSON
       const nextData    = parseNextData(html);
@@ -359,7 +483,8 @@ async function scrapeGameStop({ signal } = {}) {
           if (!isNewCondition(raw)) { skipCount++; continue; }
 
           const name = raw.productName ?? raw.name ?? raw.title ?? '';
-          if (!isPokemonProduct(name)) { skipCount++; continue; }
+          const details = raw.description ?? raw.shortDescription ?? '';
+          if (!isPokemonTcgProduct(name, details)) { skipCount++; continue; }
 
           seen.add(sku);
           products.push(normalizeJsonProduct(raw));
@@ -407,6 +532,14 @@ async function scrapeGameStop({ signal } = {}) {
     `[GameStop] Done: ${products.length} products ` +
     `(${inStock} in-stock, ${outOfStock} OOS, ${preOrder} pre-order)`,
   );
+
+  if (!products.length) {
+    const err = new Error(fetchFailures && !parsedPages
+      ? '[GameStop] public pages were blocked or unavailable'
+      : '[GameStop] No Pokemon TCG products parsed from public pages');
+    err.sourceStatus = fetchFailures && !parsedPages ? 'blocked' : 'parser_stale';
+    throw err;
+  }
 
   return products;
 }
@@ -474,4 +607,7 @@ module.exports = {
   parseHtmlProducts,
   getStockStatusFromJson,
   isPokemonProduct,
+  isPokemonTcgProduct,
+  extractJsonPrices,
+  extractHtmlPrices,
 };
