@@ -1,4 +1,5 @@
 const ebay = require('./ebay-sold');
+const justtcg = require('./justtcg');
 const ptcg = require('./pokemontcgapi');
 
 const MAX_OBSERVATIONS = parseInt(process.env.MARKET_PRICE_MAX_OBSERVATIONS || '8', 10);
@@ -32,6 +33,24 @@ function preferredFailure(attempts) {
 
 async function estimateOne(observation, { signal } = {}) {
   const attempts = [];
+
+  try {
+    const structured = await justtcg.fetchJustTcgEstimate(observation, { signal });
+    attempts.push(structured);
+    if (structured.status === 'success') return attachAttempts(structured, attempts);
+  } catch (err) {
+    attempts.push({
+      source: 'justtcg',
+      status: justtcg.marketErrorStatus(err),
+      estimate: null,
+      currency: 'USD',
+      evidence_count: 0,
+      observed_at: new Date().toISOString(),
+      query: observation.name,
+      url: null,
+      message: err.message,
+    });
+  }
 
   try {
     const structured = await ptcg.fetchPtcgApiEstimate(observation, { signal });
