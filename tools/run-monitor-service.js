@@ -48,6 +48,152 @@ function sourcesFrom(statuses) {
   }));
 }
 
+function publicBaseUrl(req) {
+  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  return `${req.protocol}://${req.get('host')}`;
+}
+
+function openApiSpec(req) {
+  return {
+    openapi: '3.1.0',
+    info: {
+      title: 'Pokemon Restock Monitor',
+      version: '0.1.0',
+      description: 'Runs the safe Pokemon restock monitor dry-run and returns source statuses plus canonical observations.',
+    },
+    servers: [{ url: publicBaseUrl(req) }],
+    paths: {
+      '/health': {
+        get: {
+          operationId: 'health',
+          summary: 'Check service health without running the monitor',
+          responses: {
+            200: {
+              description: 'Service health status',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/HealthResponse' },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/run_monitor': {
+        post: {
+          operationId: 'run_monitor',
+          summary: 'Run the safe Pokemon restock monitor dry-run',
+          description: 'Runs the Barnes & Noble observation slice with notifications disabled and no persistent state mutation.',
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: {
+              description: 'Monitor completed and returned structured observations',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/RunMonitorResponse' },
+                },
+              },
+            },
+            401: {
+              description: 'Missing or invalid bearer token',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+            409: {
+              description: 'A monitor run is already in progress',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+        },
+      },
+      schemas: {
+        HealthResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            service: { type: 'string' },
+            auth_required: { type: 'boolean' },
+          },
+          required: ['status', 'service', 'auth_required'],
+        },
+        SourceStatus: {
+          type: 'object',
+          properties: {
+            source: { type: 'string' },
+            status: { type: 'string' },
+            product_count: { type: 'integer' },
+            elapsed_ms: { type: ['integer', 'null'] },
+            message: { type: ['string', 'null'] },
+          },
+          required: ['source', 'status', 'product_count', 'elapsed_ms', 'message'],
+        },
+        Observation: {
+          type: 'object',
+          properties: {
+            source: { type: 'string' },
+            source_type: { type: 'string' },
+            source_listing_id: { type: ['string', 'null'] },
+            product_id: { type: ['string', 'null'] },
+            name: { type: ['string', 'null'] },
+            price: { type: ['number', 'null'] },
+            currency: { type: ['string', 'null'] },
+            availability: { type: 'string' },
+            url: { type: ['string', 'null'] },
+            observed_at: { type: 'string' },
+            confidence: { type: 'string' },
+            source_status: { type: 'string' },
+            raw_status: { type: ['string', 'null'] },
+          },
+          required: ['source', 'source_type', 'source_listing_id', 'product_id', 'name', 'price', 'currency', 'availability', 'url', 'observed_at', 'confidence', 'source_status', 'raw_status'],
+        },
+        RunMonitorResponse: {
+          type: 'object',
+          properties: {
+            run_id: { type: 'string' },
+            status: { type: 'string' },
+            started_at: { type: 'string' },
+            completed_at: { type: 'string' },
+            duration_ms: { type: 'integer' },
+            sources: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/SourceStatus' },
+            },
+            observations: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/Observation' },
+            },
+            error: { type: 'string' },
+          },
+          required: ['run_id', 'status', 'started_at', 'completed_at', 'duration_ms', 'sources', 'observations'],
+        },
+        ErrorResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            message: { type: 'string' },
+          },
+          required: ['status'],
+        },
+      },
+    },
+  };
+}
+
 async function executeRunMonitor() {
   const runId = crypto.randomUUID();
   const startedAt = new Date().toISOString();
@@ -84,6 +230,10 @@ app.get('/health', (req, res) => {
     service: 'pokemon-restock-run-monitor',
     auth_required: Boolean(token),
   });
+});
+
+app.get('/openapi.json', (req, res) => {
+  res.json(openApiSpec(req));
 });
 
 app.post('/run_monitor', async (req, res) => {

@@ -137,6 +137,7 @@ By default it binds to `127.0.0.1:8787`. When a host such as Render supplies `PO
 
 ```http
 GET /health
+GET /openapi.json
 POST /run_monitor
 ```
 
@@ -196,6 +197,21 @@ RUN_MONITOR_TOKEN = <long random secret>
 ```
 
 Render supplies `PORT`; do not commit or paste the bearer token into source control.
+
+ChatGPT Action setup:
+
+1. Create or edit a custom GPT.
+2. Open **Configure** -> **Actions** -> **Create new action**.
+3. Set authentication to **API key**.
+4. Choose **Bearer** auth.
+5. Paste the same secret value stored in Render as `RUN_MONITOR_TOKEN`.
+6. Import the schema from:
+
+```text
+https://pokemon-restock.onrender.com/openapi.json
+```
+
+The action exposes one operation, `run_monitor`, which maps to `POST /run_monitor`.
 
 ---
 
