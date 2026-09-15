@@ -14,7 +14,7 @@ const notifierMod    = require('../notifier');
 const msrpMod        = require('../msrpChecker');
 const stateMod       = require('../stateManager');
 
-const { run, buildCanonicalObservations } = require('../monitor');
+const { run, buildCanonicalObservations, marketStatusFromEstimates } = require('../monitor');
 
 const MOCK_PRODUCT = {
   id:           'target-111',
@@ -236,5 +236,20 @@ describe('monitor observations artifact', () => {
       source_status: 'success',
       raw_status: 'in_stock',
     }]);
+  });
+});
+
+describe('monitor market status aggregation', () => {
+  it('reports blocked when all market estimates are blocked', () => {
+    assert.equal(marketStatusFromEstimates([
+      { market: { status: 'blocked' } },
+      { market: { status: 'blocked' } },
+    ]), 'blocked');
+  });
+
+  it('reports insufficient evidence without creating success', () => {
+    assert.equal(marketStatusFromEstimates([
+      { market: { status: 'insufficient_market_evidence' } },
+    ]), 'insufficient_market_evidence');
   });
 });

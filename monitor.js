@@ -211,12 +211,14 @@ async function scanOpportunities(observations) {
       marketMod.estimateMarketPrices(observations, { signal }),
     );
     const opportunityCandidates = opportunityMod.buildOpportunityCandidates(observations, marketEstimates);
+    const status = marketStatusFromEstimates(marketEstimates);
     return {
       marketEstimates,
       opportunityCandidates,
-      marketStatus: sourceStatus('market', 'success', {
+      marketStatus: sourceStatus('market', status, {
         elapsedMs: Date.now() - t0,
         productCount: marketEstimates.length,
+        message: status === 'success' ? null : 'No high-confidence market estimate available for every observation',
       }),
     };
   } catch (err) {
@@ -229,6 +231,19 @@ async function scanOpportunities(observations) {
       }),
     };
   }
+}
+
+function marketStatusFromEstimates(marketEstimates) {
+  if (!marketEstimates.length) return 'no_observations';
+  const statuses = marketEstimates.map(entry => entry.market?.status || 'unknown');
+  if (statuses.every(status => status === 'success')) return 'success';
+  if (statuses.every(status => status === 'blocked')) return 'blocked';
+  if (statuses.every(status => status === 'timeout')) return 'timeout';
+  if (statuses.every(status => status === 'insufficient_market_evidence')) return 'insufficient_market_evidence';
+  if (statuses.includes('success')) return 'partial';
+  if (statuses.includes('blocked')) return 'blocked';
+  if (statuses.includes('timeout')) return 'timeout';
+  return 'unavailable';
 }
 
 // ── First-run detection ───────────────────────────────────────────────────────
@@ -676,4 +691,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { run, classifyError, withSourceBudget, buildCanonicalObservations };
+module.exports = { run, classifyError, withSourceBudget, buildCanonicalObservations, marketStatusFromEstimates };
