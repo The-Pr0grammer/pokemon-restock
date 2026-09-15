@@ -13,6 +13,8 @@ process.env.BESTBUY_ENABLED = process.env.BESTBUY_ENABLED || 'true';
 process.env.AMAZON_ENABLED = process.env.AMAZON_ENABLED || 'true';
 process.env.GAMESTOP_ENABLED = 'false';
 process.env.BN_ENABLED = 'true';
+process.env.COSTCO_ENABLED = process.env.COSTCO_ENABLED || 'true';
+process.env.SAMSCLUB_ENABLED = process.env.SAMSCLUB_ENABLED || 'true';
 process.env.OBSERVATION_SOURCE = process.env.OBSERVATION_SOURCE || 'all';
 process.env.MAX_PAGES = process.env.DRY_RUN_MAX_PAGES || '1';
 process.env.BN_KEYWORD_LIMIT = process.env.BN_DRY_RUN_KEYWORD_LIMIT || '6';
@@ -21,6 +23,8 @@ process.env.PC_QUEUE_SOURCE_TIMEOUT_MS = process.env.PC_QUEUE_SOURCE_TIMEOUT_MS 
 process.env.MSRP_SOURCE_TIMEOUT_MS = process.env.MSRP_SOURCE_TIMEOUT_MS || '12000';
 process.env.BESTBUY_SOURCE_TIMEOUT_MS = process.env.BESTBUY_SOURCE_TIMEOUT_MS || '9000';
 process.env.BN_SOURCE_TIMEOUT_MS = process.env.BN_SOURCE_TIMEOUT_MS || '16000';
+process.env.COSTCO_SOURCE_TIMEOUT_MS = process.env.COSTCO_SOURCE_TIMEOUT_MS || '12000';
+process.env.SAMSCLUB_SOURCE_TIMEOUT_MS = process.env.SAMSCLUB_SOURCE_TIMEOUT_MS || '12000';
 process.env.REDDIT_SOURCE_TIMEOUT_MS = process.env.REDDIT_SOURCE_TIMEOUT_MS || '8000';
 process.env.MARKET_ENABLED = process.env.MARKET_ENABLED || 'true';
 process.env.MARKET_SOURCE_TIMEOUT_MS = process.env.MARKET_SOURCE_TIMEOUT_MS || '12000';
@@ -166,6 +170,14 @@ function openApiSpec(req) {
             verification_state: { type: 'string' },
             source_status: { type: 'string' },
             raw_status: { type: ['string', 'null'] },
+            seller_name: { type: ['string', 'null'] },
+            seller_type: { type: ['string', 'null'] },
+            membership_required: { type: ['boolean', 'null'] },
+            product_kind: { type: ['string', 'null'] },
+            bundle_components: { type: ['array', 'null'], items: { type: 'object' } },
+            quantity: { type: ['number', 'null'] },
+            unit_acquisition_price: { type: ['number', 'null'] },
+            fulfillment: { type: ['object', 'null'] },
           },
           required: ['source', 'source_type', 'source_listing_id', 'product_id', 'name', 'price', 'currency', 'availability', 'url', 'observed_at', 'confidence', 'verification_state', 'source_status', 'raw_status'],
         },

@@ -82,6 +82,18 @@ module.exports = {
       color:   0x1d6b3d,
       keywords,
     },
+    costco: {
+      enabled: process.env.COSTCO_ENABLED !== 'false',
+      name:    'Costco',
+      color:   0x005dab,
+      keywords,
+    },
+    samsclub: {
+      enabled: process.env.SAMSCLUB_ENABLED !== 'false',
+      name:    "Sam's Club",
+      color:   0x007dc6,
+      keywords,
+    },
     pokemoncenter: {
       enabled:         process.env.PC_ENABLED !== 'false',
       name:            'Pokemon Center',

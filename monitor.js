@@ -33,6 +33,8 @@ const bestbuyScraper  = require('./scrapers/bestbuy');
 const amazonScraper   = require('./scrapers/amazon');
 const gamestopScraper = require('./scrapers/gamestop');
 const bnScraper       = require('./scrapers/barnesandnoble');
+const costcoScraper   = require('./scrapers/costco');
+const samsScraper     = require('./scrapers/samsclub');
 const pcScraper       = require('./scrapers/pokemoncenter');
 const redditMonitor   = require('./monitors/reddit');
 const notifierMod     = require('./notifier');
@@ -61,6 +63,8 @@ const SOURCE_BUDGET_MS = {
   amazon:              parseInt(process.env.AMAZON_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
   gamestop:            parseInt(process.env.GAMESTOP_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
   barnesandnoble:      parseInt(process.env.BN_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  costco:              parseInt(process.env.COSTCO_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
+  samsclub:            parseInt(process.env.SAMSCLUB_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
   reddit:              parseInt(process.env.REDDIT_SOURCE_TIMEOUT_MS || String(DEFAULT_SOURCE_BUDGET_MS), 10),
   market:              parseInt(process.env.MARKET_SOURCE_TIMEOUT_MS || '12000', 10),
 };
@@ -159,7 +163,7 @@ function canonicalObservation(product, sourceStatusEntry, observedAt) {
     ? 'unverified'
     : (!url ? 'inferred' : /\/search(?:\?|$)|[?&]q=/i.test(url) ? 'search_result' : 'direct_product_page');
 
-  return {
+  const observation = {
     source,
     source_type: 'retail_listing',
     source_listing_id: sourceListingId != null ? String(sourceListingId) : null,
@@ -175,6 +179,29 @@ function canonicalObservation(product, sourceStatusEntry, observedAt) {
     source_status: sourceStatusEntry?.status || 'unknown',
     raw_status: product.stockStatus || null,
   };
+
+  const optionalFields = [
+    'sellerName',
+    'sellerType',
+    'membershipRequired',
+    'productKind',
+    'bundleComponents',
+    'quantity',
+    'unitAcquisitionPrice',
+    'fulfillment',
+    'pickupStatus',
+    'memberPrice',
+    'publicPrice',
+  ];
+
+  for (const field of optionalFields) {
+    if (product[field] !== undefined) {
+      const canonicalField = field.replace(/[A-Z]/g, char => `_${char.toLowerCase()}`);
+      observation[canonicalField] = product[field];
+    }
+  }
+
+  return observation;
 }
 
 function buildCanonicalObservations(scraperResults, sourceStatuses, observedAt = new Date().toISOString()) {
@@ -276,6 +303,8 @@ const SCRAPERS = [
   { key: 'amazon',          name: 'Amazon',          fn: (opts) => amazonScraper.scrapeAmazon(opts),           cfg: () => config.retailers.amazon          },
   { key: 'gamestop',        name: 'GameStop',        fn: (opts) => gamestopScraper.scrapeGameStop(opts),       cfg: () => config.retailers.gamestop        },
   { key: 'barnesandnoble',  name: 'Barnes & Noble',  fn: (opts) => bnScraper.scrapeBarnesAndNoble(opts),       cfg: () => config.retailers.barnesandnoble  },
+  { key: 'costco',          name: 'Costco',          fn: (opts) => costcoScraper.scrapeCostco(opts),           cfg: () => config.retailers.costco          },
+  { key: 'samsclub',        name: "Sam's Club",      fn: (opts) => samsScraper.scrapeSamsClub(opts),           cfg: () => config.retailers.samsclub        },
 ];
 
 // ── Phase 0: Pokemon Center queue check ──────────────────────────────────────

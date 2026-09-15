@@ -57,6 +57,8 @@ jobs:
       AMAZON_FBA_ONLY:     ${{ vars.AMAZON_FBA_ONLY     || 'false' }}
       GAMESTOP_ENABLED:    ${{ vars.GAMESTOP_ENABLED     || 'false' }}
       BN_ENABLED:          ${{ vars.BN_ENABLED           || 'true' }}
+      COSTCO_ENABLED:      ${{ vars.COSTCO_ENABLED       || 'true' }}
+      SAMSCLUB_ENABLED:    ${{ vars.SAMSCLUB_ENABLED     || 'true' }}
       PC_ENABLED:          ${{ vars.PC_ENABLED           || 'true' }}
       PC_COOKIE:           ${{ secrets.PC_COOKIE }}
       PC_WATCH_URLS:       ${{ vars.PC_WATCH_URLS }}
@@ -79,6 +81,8 @@ jobs:
       MSRP_SOURCE_TIMEOUT_MS: ${{ vars.MSRP_SOURCE_TIMEOUT_MS || '12000' }}
       BESTBUY_SOURCE_TIMEOUT_MS: ${{ vars.BESTBUY_SOURCE_TIMEOUT_MS || '9000' }}
       BN_SOURCE_TIMEOUT_MS: ${{ vars.BN_SOURCE_TIMEOUT_MS || '16000' }}
+      COSTCO_SOURCE_TIMEOUT_MS: ${{ vars.COSTCO_SOURCE_TIMEOUT_MS || '12000' }}
+      SAMSCLUB_SOURCE_TIMEOUT_MS: ${{ vars.SAMSCLUB_SOURCE_TIMEOUT_MS || '12000' }}
       REDDIT_SOURCE_TIMEOUT_MS: ${{ vars.REDDIT_SOURCE_TIMEOUT_MS || '8000' }}
       BESTBUY_HTML_TIMEOUT_MS: ${{ vars.BESTBUY_HTML_TIMEOUT_MS || '8000' }}
       BESTBUY_HTML_MAX_ATTEMPTS: ${{ vars.BESTBUY_HTML_MAX_ATTEMPTS || '1' }}

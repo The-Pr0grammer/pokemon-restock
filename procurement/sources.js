@@ -66,19 +66,19 @@ const SOURCES = {
     name: 'Costco',
     tier: 2,
     role: 'club_procurement',
-    implemented: false,
+    implemented: true,
     first_party_required: true,
     preserve_local_inventory: true,
-    notes: 'Planned source. Bundle/unit economics and membership gating must be preserved.',
+    notes: 'Club-store source. Bundle/unit economics and membership gating must be preserved.',
   },
   samsclub: {
     name: "Sam's Club",
     tier: 2,
     role: 'club_procurement',
-    implemented: false,
+    implemented: true,
     first_party_required: true,
     preserve_local_inventory: true,
-    notes: 'Planned source. Bundle/unit economics and membership gating must be preserved.',
+    notes: 'Club-store source. Bundle/unit economics and membership gating must be preserved.',
   },
 };
 
