@@ -1,6 +1,5 @@
 const ebay = require('./ebay-sold');
 const justtcg = require('./justtcg');
-const ptcg = require('./pokemontcgapi');
 
 const MAX_OBSERVATIONS = parseInt(process.env.MARKET_PRICE_MAX_OBSERVATIONS || '8', 10);
 
@@ -53,24 +52,6 @@ async function estimateOne(observation, { signal } = {}) {
   }
 
   try {
-    const structured = await ptcg.fetchPtcgApiEstimate(observation, { signal });
-    attempts.push(structured);
-    if (structured.status === 'success') return attachAttempts(structured, attempts);
-  } catch (err) {
-    attempts.push({
-      source: 'pokemontcgapi_tcgplayer',
-      status: ptcg.marketErrorStatus(err),
-      estimate: null,
-      currency: 'USD',
-      evidence_count: 0,
-      observed_at: new Date().toISOString(),
-      query: observation.name,
-      url: null,
-      message: err.message,
-    });
-  }
-
-  try {
     const sold = await ebay.fetchEbaySoldEstimate(observation, { signal });
     attempts.push(sold);
     if (sold.status === 'success') return attachAttempts(sold, attempts);
@@ -93,7 +74,11 @@ async function estimateOne(observation, { signal } = {}) {
 
 async function estimateMarketPrices(observations, { signal } = {}) {
   const eligible = observations
-    .filter(obs => obs.confidence === 'verified' && obs.name && typeof obs.price === 'number')
+    .filter(obs =>
+      obs.confidence === 'verified' &&
+      obs.availability === 'in_stock' &&
+      obs.name &&
+      typeof obs.price === 'number')
     .slice(0, MAX_OBSERVATIONS);
 
   const estimates = [];
