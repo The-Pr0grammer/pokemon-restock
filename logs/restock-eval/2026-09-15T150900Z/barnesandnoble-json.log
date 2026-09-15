@@ -1,0 +1,209 @@
+[B&N] Starting Pokemon TCG search via predictive-search API
+[B&N] "pokemon trading card game": 10 results → 8 added, 2 skipped
+[B&N] "pokemon booster pack": 10 results → 3 added, 6 skipped
+[B&N] "pokemon elite trainer box": 10 results → 0 added, 7 skipped
+[B&N] "pokemon tin": 10 results → 0 added, 8 skipped
+[B&N] "pokemon collection box": 10 results → 0 added, 5 skipped
+[B&N] "pokemon starter deck": 10 results → 1 added, 9 skipped
+[B&N] "pokemon tcg scarlet violet": 10 results → 0 added, 8 skipped
+[B&N] "pokemon tcg": 10 results → 1 added, 3 skipped
+[B&N] "pokemon bundle box": 10 results → 0 added, 2 skipped
+[B&N] "pokemon league battle deck": 10 results → 0 added, 10 skipped
+[B&N] Done: 13 products (12 in-stock, 1 OOS, 0 pre-order, 27 books filtered)
+[
+  {
+    "id": "bn-820650856952",
+    "retailer": "barnesandnoble",
+    "ean": "820650856952",
+    "shopifyId": "9050817364209",
+    "name": "Pokemon Battle Academy Board Game",
+    "brand": null,
+    "price": "$24.99",
+    "priceNumeric": 24.99,
+    "regularPrice": null,
+    "url": "/w/0820650856952/820650856952",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": "2024-09-18"
+  },
+  {
+    "id": "bn-74427102845",
+    "retailer": "barnesandnoble",
+    "ean": "74427102845",
+    "shopifyId": "9029201133809",
+    "name": "Pokemon Trainer Guess Legacy Pokeball",
+    "brand": null,
+    "price": "$25.00",
+    "priceNumeric": 25,
+    "regularPrice": null,
+    "url": "/w/0074427102845/74427102845",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": "2021-07-05"
+  },
+  {
+    "id": "bn-820650809064",
+    "retailer": "barnesandnoble",
+    "ean": "820650809064",
+    "shopifyId": "9029225054449",
+    "name": "Pokemon Battle Academy Boardgame 2",
+    "brand": null,
+    "price": "$19.99",
+    "priceNumeric": 19.99,
+    "regularPrice": null,
+    "url": "/w/0820650809064/820650809064",
+    "inStock": false,
+    "stockStatus": "out_of_stock",
+    "releaseDate": "2022-04-22"
+  },
+  {
+    "id": "bn-74427102968",
+    "retailer": "barnesandnoble",
+    "ean": "74427102968",
+    "shopifyId": "9029192679665",
+    "name": "Pokemon Trainer Guess Champion Edition",
+    "brand": null,
+    "price": "$25.00",
+    "priceNumeric": 25,
+    "regularPrice": null,
+    "url": "/w/0074427102968/74427102968",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": "2023-06-30"
+  },
+  {
+    "id": "bn-74427103057",
+    "retailer": "barnesandnoble",
+    "ean": "74427103057",
+    "shopifyId": "9636138156273",
+    "name": "Pokemon Trainer Expert",
+    "brand": null,
+    "price": "$29.99",
+    "priceNumeric": 29.99,
+    "regularPrice": null,
+    "url": "/w/0074427103057/74427103057",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": "2026-07-01"
+  },
+  {
+    "id": "bn-74427102807",
+    "retailer": "barnesandnoble",
+    "ean": "74427102807",
+    "shopifyId": "9029200969969",
+    "name": "Pokemon Trainer Guess Ashs Adventures",
+    "brand": null,
+    "price": "$25.00",
+    "priceNumeric": 25,
+    "regularPrice": null,
+    "url": "/w/0074427102807/74427102807",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": "2021-07-05"
+  },
+  {
+    "id": "bn-74427103095",
+    "retailer": "barnesandnoble",
+    "ean": "74427103095",
+    "shopifyId": "9636138123505",
+    "name": "Pokemon Trainer Ultimate",
+    "brand": null,
+    "price": "$39.99",
+    "priceNumeric": 39.99,
+    "regularPrice": null,
+    "url": "/w/0074427103095/74427103095",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": "2026-09-01"
+  },
+  {
+    "id": "bn-191726426028",
+    "retailer": "barnesandnoble",
+    "ean": "191726426028",
+    "shopifyId": "8976420929777",
+    "name": "Pokemon Holiday Calendar",
+    "brand": null,
+    "price": "$39.99",
+    "priceNumeric": 39.99,
+    "regularPrice": null,
+    "url": "/w/0191726426028/191726426028",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": "2022-08-30"
+  },
+  {
+    "id": "bn-9798256395193",
+    "retailer": "barnesandnoble",
+    "ean": "9798256395193",
+    "shopifyId": "9638715031793",
+    "name": "Why The Opening Pokemon Trading Card Game Booster Card Packs Video Genre Has Become A Popular Genre On Social Media",
+    "brand": null,
+    "price": "$21.99",
+    "priceNumeric": 21.99,
+    "regularPrice": null,
+    "url": "/w/9798256395193/9798256395193",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": "2026-06-01"
+  },
+  {
+    "id": "bn-4573102640758",
+    "retailer": "barnesandnoble",
+    "ean": "4573102640758",
+    "shopifyId": "9050821361905",
+    "name": "Charmander Pokemon Model Kit",
+    "brand": null,
+    "price": "$10.00",
+    "priceNumeric": 10,
+    "regularPrice": null,
+    "url": "/w/4573102640758/4573102640758",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": "2025-01-01"
+  },
+  {
+    "id": "bn-9476135026929",
+    "retailer": "barnesandnoble",
+    "ean": null,
+    "shopifyId": "9476135026929",
+    "name": "Pokemon TCG: XY3 Sleeved Booster Pack",
+    "brand": null,
+    "price": "$3.95",
+    "priceNumeric": 3.95,
+    "regularPrice": null,
+    "url": "https://www.barnesandnoble.com/search?q=Pokemon%20TCG%3A%20XY3%20Sleeved%20Booster%20Pack",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": null
+  },
+  {
+    "id": "bn-9476134371569",
+    "retailer": "barnesandnoble",
+    "ean": null,
+    "shopifyId": "9476134371569",
+    "name": "Pokemon TCG: XY-Kalos Starter Set Deluxe Deck",
+    "brand": null,
+    "price": "$14.95",
+    "priceNumeric": 14.95,
+    "regularPrice": null,
+    "url": "https://www.barnesandnoble.com/search?q=Pokemon%20TCG%3A%20XY-Kalos%20Starter%20Set%20Deluxe%20Deck",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": null
+  },
+  {
+    "id": "bn-2940185469729",
+    "retailer": "barnesandnoble",
+    "ean": "2940185469729",
+    "shopifyId": "9646872789233",
+    "name": "The Best Set Type Of Pokemon Trading Card Game Cards To Invest In Buying Cards From And How To Find A Worthwhile Card",
+    "brand": null,
+    "price": "$14.99",
+    "priceNumeric": 14.99,
+    "regularPrice": null,
+    "url": "/w/2940185469729/2940185469729",
+    "inStock": true,
+    "stockStatus": "in_stock",
+    "releaseDate": "2026-06-16"
+  }
+]

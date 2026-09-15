@@ -1,0 +1,138 @@
+[Monitor] Dry-run mode — scraping and comparing, but no notifications or state writes.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Pokemon TCG Monitor  ·  2026-09-15T15:21:54.669Z  [DRY RUN]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[1/6] Pokemon Center queue check
+[PC] Starting Pokemon Center check
+[PC] No PC_COOKIE — queue detection only (products skipped)
+[PC] Polling Queue-it subdomains: pokemoncenter, pokemon, tpci
+[PC] Queue-it pokemoncenter probe: 404 (no active queue)
+[PC] Queue-it pokemoncenter probe: 404 (no active queue)
+[PC] Queue-it pokemoncenter probe: 404 (no active queue)
+[PC] Queue-it pokemoncenter probe: 404 (no active queue)
+[PC] Queue-it pokemon probe: 404 (no active queue)
+[PC] Queue-it pokemon probe: 404 (no active queue)
+[PC] Queue-it pokemon probe: 404 (no active queue)
+[PC] Queue-it pokemon probe: 404 (no active queue)
+[PC] Queue-it tpci probe: 404 (no active queue)
+[PC] Queue-it tpci probe: 404 (no active queue)
+[PC] Queue-it tpci probe: 404 (no active queue)
+[PC] Queue-it tpci probe: 404 (no active queue)
+[PC] No active queue detected
+      No active queue detected  (5.0s)
+
+[2/6] MSRP database
+[MSRP] Scraping Pokemon Center for MSRP data…
+[MSRP] Fetching https://www.pokemoncenter.com/category/trading-card-game?page=1
+[MSRP] __NEXT_DATA__ strategy empty for https://www.pokemoncenter.com/category/trading-card-game?page=1 — trying HTML parser
+[MSRP] No products found on https://www.pokemoncenter.com/category/trading-card-game?page=1 — stopping pagination
+[MSRP] Fetching https://www.pokemoncenter.com/category/trading-card-game/booster-packs?page=1
+[MSRP] __NEXT_DATA__ strategy empty for https://www.pokemoncenter.com/category/trading-card-game/booster-packs?page=1 — trying HTML parser
+[MSRP] No products found on https://www.pokemoncenter.com/category/trading-card-game/booster-packs?page=1 — stopping pagination
+[MSRP] Fetching https://www.pokemoncenter.com/category/trading-card-game/elite-trainer-boxes?page=1
+[MSRP] __NEXT_DATA__ strategy empty for https://www.pokemoncenter.com/category/trading-card-game/elite-trainer-boxes?page=1 — trying HTML parser
+[MSRP] No products found on https://www.pokemoncenter.com/category/trading-card-game/elite-trainer-boxes?page=1 — stopping pagination
+[MSRP] Fetching https://www.pokemoncenter.com/category/trading-card-game/tins-and-collections?page=1
+[MSRP] __NEXT_DATA__ strategy empty for https://www.pokemoncenter.com/category/trading-card-game/tins-and-collections?page=1 — trying HTML parser
+[MSRP] No products found on https://www.pokemoncenter.com/category/trading-card-game/tins-and-collections?page=1 — stopping pagination
+[MSRP] No products extracted from Pokemon Center. The site may have changed its HTML/JSON structure or is blocking requests. Check the selector strategies in extractProductsFromHtml() and the recursive search in findProductArraysInObject().
+   ⚠ Update failed — using stale cache. [MSRP] No products extracted from Pokemon Center. The site may have changed its HTML/JSON structure or is blocking requests. Check the selector strategies in extractProductsFromHtml() and the recursive search in findProductArraysInObject().
+
+[3/6] Scraping retailers  (Target + Walmart + Best Buy + Amazon + Barnes & Noble — parallel)
+      Disabled: GameStop
+[Target] Starting — keyword: "pokemon cards"
+[Walmart] Initialising session…
+[Best Buy] Starting — HTML fallback mode (set BESTBUY_API_KEY for better results)
+[Best Buy] No API key — using HTML scraping fallback
+[Best Buy] HTML — searching: "pokemon trading card game"
+[Amazon] Missing credentials — set AMAZON_ACCESS_KEY, AMAZON_SECRET_KEY, AMAZON_PARTNER_TAG.
+         Sign up free at https://affiliate-program.amazon.com
+[B&N] Starting Pokemon TCG search via predictive-search API
+[Reddit] Polling: r/PokemonTCG, r/PokeInvesting
+[Target] all pass — page 1 failed: Request failed with status code 435
+[Target] All-products pass returned 0 items
+[Walmart] Session ready
+[Reddit] Failed to fetch r/PokemonTCG: Request failed with status code 403
+[Reddit] Failed to fetch r/PokeInvesting: Request failed with status code 403
+[Reddit] Done: 0 fetched, 0 already seen, 0 filtered out, 0 new restock signals
+[B&N] "pokemon trading card game": 10 results → 8 added, 2 skipped
+[Walmart] Searching: "pokemon trading card game"
+[B&N] "pokemon booster pack": 10 results → 3 added, 6 skipped
+[B&N] "pokemon elite trainer box": 10 results → 0 added, 7 skipped
+[Walmart] "pokemon trading card game": 492 results, 13 pages
+[Walmart] "pokemon trading card game" page 1/3: 60 items → 1 added, 59 3rd-party skipped
+[B&N] "pokemon tin": 10 results → 0 added, 8 skipped
+[B&N] "pokemon collection box": 10 results → 0 added, 5 skipped
+[Walmart] "pokemon trading card game" page 2/3: 45 items → 1 added, 38 3rd-party skipped
+[B&N] "pokemon starter deck": 10 results → 1 added, 9 skipped
+[B&N] "pokemon tcg scarlet violet": 10 results → 0 added, 8 skipped
+[B&N] "pokemon tcg": 10 results → 1 added, 3 skipped
+[Walmart] "pokemon trading card game" page 3/3: 45 items → 0 added, 31 3rd-party skipped
+[B&N] "pokemon bundle box": 10 results → 0 added, 2 skipped
+[B&N] "pokemon league battle deck": 10 results → 0 added, 10 skipped
+[B&N] Done: 13 products (12 in-stock, 1 OOS, 0 pre-order, 27 books filtered)
+[Walmart] Searching: "pokemon booster pack"
+[Walmart] "pokemon booster pack": 800 results, 13 pages
+[Walmart] "pokemon booster pack" page 1/3: 61 items → 1 added, 29 3rd-party skipped
+[Walmart] "pokemon booster pack" page 2/3: 42 items → 0 added, 37 3rd-party skipped
+[Walmart] "pokemon booster pack" page 3/3: 43 items → 0 added, 31 3rd-party skipped
+[Walmart] Searching: "pokemon elite trainer box"
+[Best Buy] HTML attempt 1 failed (timeout of 30000ms exceeded) — retrying in 2s…
+[Walmart] "pokemon elite trainer box": 188 results, 6 pages
+[Walmart] "pokemon elite trainer box" page 1/3: 60 items → 0 added, 35 3rd-party skipped
+[Walmart] "pokemon elite trainer box" page 2/3: 39 items → 0 added, 38 3rd-party skipped
+[Walmart] "pokemon elite trainer box" page 3/3: 40 items → 0 added, 38 3rd-party skipped
+[Walmart] Searching: "pokemon tin"
+[Walmart] "pokemon tin": 420 results, 11 pages
+[Walmart] "pokemon tin" page 1/3: 58 items → 0 added, 36 3rd-party skipped
+[Walmart] "pokemon tin" page 2/3: 52 items → 0 added, 35 3rd-party skipped
+[Walmart] "pokemon tin" page 3/3: 42 items → 0 added, 37 3rd-party skipped
+[Walmart] Searching: "pokemon collection box"
+[Walmart] "pokemon collection box": 445 results, 12 pages
+[Walmart] "pokemon collection box" page 1/3: 65 items → 0 added, 33 3rd-party skipped
+[Best Buy] HTML attempt 2 failed (timeout of 30000ms exceeded) — retrying in 4s…
+[Walmart] "pokemon collection box" page 2/3: 45 items → 0 added, 23 3rd-party skipped
+[Walmart] "pokemon collection box" page 3/3: 45 items → 0 added, 20 3rd-party skipped
+[Walmart] Done: 3 Walmart-sold products (1 in-stock, 2 OOS, 0 pre-order, 517 3rd-party skipped)
+[Best Buy] HTML fetch failed on "pokemon trading card game" page 1: timeout of 30000ms exceeded
+[Best Buy] HTML — searching: "pokemon booster pack"
+[Best Buy] HTML attempt 1 failed (timeout of 30000ms exceeded) — retrying in 2s…
+[Best Buy] HTML attempt 2 failed (timeout of 30000ms exceeded) — retrying in 4s…
+[Best Buy] HTML fetch failed on "pokemon booster pack" page 1: timeout of 30000ms exceeded
+[Best Buy] HTML — searching: "pokemon elite trainer box"
+[Best Buy] HTML attempt 1 failed (timeout of 30000ms exceeded) — retrying in 2s…
+[Best Buy] HTML attempt 2 failed (timeout of 30000ms exceeded) — retrying in 4s…
+[Best Buy] HTML fetch failed on "pokemon elite trainer box" page 1: timeout of 30000ms exceeded
+[Best Buy] Done: 0 products (0 in-stock, 0 OOS, 0 pre-order)
+   ✓ Target     0 product(s)  (0.4s)
+   ✓ Walmart    3 product(s)  (66.7s)
+   ✓ Best Buy   0 product(s)  (294.0s)
+   ✓ Amazon     0 product(s)  (0.0s)
+   ✓ Barnes & Noble 13 product(s)  (13.5s)
+
+[4/6] Comparing against stored state
+      Target     0 seen · no changes
+      Walmart    3 seen · no changes
+      Best Buy   0 seen · no changes
+      Amazon     0 seen · no changes
+[MSRP] Database is empty — run updateMsrpDatabase() first.
+[MSRP] Database is empty — run updateMsrpDatabase() first.
+   ✓ Barnes & Noble 13 seen · 2 new
+
+     [NEW]        Why The Opening Pokemon Trading Card Game Booster Card Packs Video Genre Has Become A Popular Genre On Social Media  $21.99  /w/9798256395193/9798256395193
+     [NEW]        Pokemon TCG: XY3 Sleeved Booster Pack  $3.95  https://www.barnesandnoble.com/search?q=Pokemon%20TCG%3A%20XY3%20Sleeved%20Booster%20Pack
+
+[5/6] Notifications  [DRY RUN — skipped]
+      Would notify: 2 product(s) — suppressed by --test flag
+
+[6/6] Save state  [DRY RUN — skipped]
+      State not written — dry-run mode keeps state ephemeral.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+16 products checked  ·  2 new  ·  DRY RUN  ·  5m 8s
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+real 308.83
+user 1.73
+sys 0.32

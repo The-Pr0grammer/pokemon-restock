@@ -1,0 +1,16 @@
+
+> pokemon-tcg-restock-monitor@1.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: monitor.run — init mode
+    # Subtest: calls initializeBaseline on first run (lastSaved === null)
+    ok 1 - calls initializeBaseline on first run (lastSaved === null)
+      ---
+      duration_ms: 64282.266235
+      ...
+    # Subtest: calls initializeBaseline when forceInit=true even if state exists
+    ok 2 - calls initializeBaseline when forceInit=true even if state exists
+      ---
+      duration_ms: 64099.965647
+      ...

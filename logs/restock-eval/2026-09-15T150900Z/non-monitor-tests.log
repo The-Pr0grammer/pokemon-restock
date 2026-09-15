@@ -1,0 +1,803 @@
+TAP version 13
+# [MSRP] Database is empty — run updateMsrpDatabase() first.
+# Subtest: MSRP — normalizeProductName
+    # Subtest: lowercases the name
+    ok 1 - lowercases the name
+      ---
+      duration_ms: 2.289359
+      ...
+    # Subtest: removes common noise words
+    ok 2 - removes common noise words
+      ---
+      duration_ms: 0.971743
+      ...
+    # Subtest: handles empty string gracefully
+    ok 3 - handles empty string gracefully
+      ---
+      duration_ms: 0.289739
+      ...
+    # Subtest: collapses extra whitespace
+    ok 4 - collapses extra whitespace
+      ---
+      duration_ms: 0.443208
+      ...
+    1..4
+ok 1 - MSRP — normalizeProductName
+  ---
+  duration_ms: 6.078052
+  type: 'suite'
+  ...
+# Subtest: MSRP — calculateSimilarity
+    # Subtest: returns 1.0 for identical names
+    ok 1 - returns 1.0 for identical names
+      ---
+      duration_ms: 0.636947
+      ...
+    # Subtest: returns a high score for names that differ only in noise words
+    ok 2 - returns a high score for names that differ only in noise words
+      ---
+      duration_ms: 0.344512
+      ...
+    # Subtest: returns a low score for completely different products
+    ok 3 - returns a low score for completely different products
+      ---
+      duration_ms: 0.843033
+      ...
+    # Subtest: penalizes product-type mismatch (ETB vs Booster)
+    ok 4 - penalizes product-type mismatch (ETB vs Booster)
+      ---
+      duration_ms: 0.573802
+      ...
+    1..4
+ok 2 - MSRP — calculateSimilarity
+  ---
+  duration_ms: 3.033018
+  type: 'suite'
+  ...
+# Subtest: MSRP — findMsrp (with temp database)
+    # Subtest: finds exact match by name
+    ok 1 - finds exact match by name
+      ---
+      duration_ms: 1.133556
+      ...
+    # Subtest: fuzzy-matches a close name
+    ok 2 - fuzzy-matches a close name
+      ---
+      duration_ms: 2.720129
+      ...
+    # Subtest: returns null for a completely unrelated name
+    ok 3 - returns null for a completely unrelated name
+      ---
+      duration_ms: 0.538773
+      ...
+    # Subtest: returns correct msrpFormatted string
+    ok 4 - returns correct msrpFormatted string
+      ---
+      duration_ms: 0.639065
+      ...
+    # Subtest: returns null when database is empty
+    ok 5 - returns null when database is empty
+      ---
+      duration_ms: 2.870592
+      ...
+    1..5
+ok 3 - MSRP — findMsrp (with temp database)
+  ---
+  duration_ms: 10.3532
+  type: 'suite'
+  ...
+# [Discord] No DISCORD_WEBHOOK_URL set — skipping.
+# [Discord] Sent 1 embed(s) for Target → main channel (batch 1/1)
+# [Discord] Sent 10 embed(s) for Target → main channel (batch 1/2)
+# Subtest: Discord — buildMsrpField
+    # Subtest: returns "No match" field when msrp is null
+    ok 1 - returns "No match" field when msrp is null
+      ---
+      duration_ms: 3.74041
+      ...
+    # Subtest: shows green 🟢 when price is below MSRP
+    ok 2 - shows green 🟢 when price is below MSRP
+      ---
+      duration_ms: 0.358084
+      ...
+    # Subtest: shows red 🔴 when price is above MSRP
+    ok 3 - shows red 🔴 when price is above MSRP
+      ---
+      duration_ms: 0.284016
+      ...
+    # Subtest: shows ⚪ when price equals MSRP
+    ok 4 - shows ⚪ when price equals MSRP
+      ---
+      duration_ms: 0.50017
+      ...
+    1..4
+ok 4 - Discord — buildMsrpField
+  ---
+  duration_ms: 8.737329
+  type: 'suite'
+  ...
+# Subtest: Discord — buildEmbed
+    # Subtest: uses retailer color for new products
+    ok 1 - uses retailer color for new products
+      ---
+      duration_ms: 5.520408
+      ...
+    # Subtest: uses green restock color for restocked products
+    ok 2 - uses green restock color for restocked products
+      ---
+      duration_ms: 0.435652
+      ...
+    # Subtest: prefixes title with 🆕 for new products
+    ok 3 - prefixes title with 🆕 for new products
+      ---
+      duration_ms: 0.54499
+      ...
+    # Subtest: prefixes title with 🔄 RESTOCK for restocked products
+    ok 4 - prefixes title with 🔄 RESTOCK for restocked products
+      ---
+      duration_ms: 0.619436
+      ...
+    # Subtest: includes a "Was" field when previousStockStatus is set
+    ok 5 - includes a "Was" field when previousStockStatus is set
+      ---
+      duration_ms: 0.636556
+      ...
+    # Subtest: does not include "Was" field for new products
+    ok 6 - does not include "Was" field for new products
+      ---
+      duration_ms: 0.696446
+      ...
+    # Subtest: includes Release Date field when releaseDate is set
+    ok 7 - includes Release Date field when releaseDate is set
+      ---
+      duration_ms: 0.550108
+      ...
+    # Subtest: truncates very long titles to 256 chars
+    ok 8 - truncates very long titles to 256 chars
+      ---
+      duration_ms: 0.478525
+      ...
+    # Subtest: sets embed url to product url
+    ok 9 - sets embed url to product url
+      ---
+      duration_ms: 0.6578
+      ...
+    1..9
+ok 5 - Discord — buildEmbed
+  ---
+  duration_ms: 11.416529
+  type: 'suite'
+  ...
+# Subtest: Discord — sendDiscordNotification
+    # Subtest: returns { sent: 0, failed: 0 } with no webhook configured
+    ok 1 - returns { sent: 0, failed: 0 } with no webhook configured
+      ---
+      duration_ms: 5.670751
+      ...
+    # Subtest: returns { sent: 0, failed: 0 } for empty product list
+    ok 2 - returns { sent: 0, failed: 0 } for empty product list
+      ---
+      duration_ms: 0.402377
+      ...
+    # Subtest: posts to webhook and returns sent count
+    ok 3 - posts to webhook and returns sent count
+      ---
+      duration_ms: 1.462711
+      ...
+# [Discord] Sent 2 embed(s) for Target → main channel (batch 2/2)
+    # Subtest: sends multiple messages when products exceed 10 (embed limit)
+    ok 4 - sends multiple messages when products exceed 10 (embed limit)
+      ---
+      duration_ms: 1503.935144
+      ...
+    # Subtest: increments failed count when post throws
+    ok 5 - increments failed count when post throws
+      ---
+      duration_ms: 1.329312
+      ...
+    1..5
+ok 6 - Discord — sendDiscordNotification
+  ---
+  duration_ms: 1513.208741
+  type: 'suite'
+  ...
+# [Discord] 400 Bad Request: {}
+# Subtest: Email notifier — buildHtml
+    # Subtest: includes product name in output
+    ok 1 - includes product name in output
+      ---
+      duration_ms: 59.066174
+      ...
+    # Subtest: includes NEW section header when new products present
+    ok 2 - includes NEW section header when new products present
+      ---
+      duration_ms: 0.926153
+      ...
+    # Subtest: includes RESTOCK section header when restocked products present
+    ok 3 - includes RESTOCK section header when restocked products present
+      ---
+      duration_ms: 0.8374
+      ...
+    # Subtest: shows both sections when both types present
+    ok 4 - shows both sections when both types present
+      ---
+      duration_ms: 1.299082
+      ...
+    # Subtest: includes Shop Now link with product URL
+    ok 5 - includes Shop Now link with product URL
+      ---
+      duration_ms: 0.741678
+      ...
+    # Subtest: includes product price
+    ok 6 - includes product price
+      ---
+      duration_ms: 1.485517
+      ...
+    # Subtest: escapes HTML special characters in product name
+    ok 7 - escapes HTML special characters in product name
+      ---
+      duration_ms: 0.771305
+      ...
+    # Subtest: shows MSRP when present
+    ok 8 - shows MSRP when present
+      ---
+      duration_ms: 1.044246
+      ...
+    # Subtest: shows release date when present
+    ok 9 - shows release date when present
+      ---
+      duration_ms: 3.416047
+      ...
+    # Subtest: includes footer text
+    ok 10 - includes footer text
+      ---
+      duration_ms: 1.775288
+      ...
+    1..10
+ok 7 - Email notifier — buildHtml
+  ---
+  duration_ms: 87.037768
+  type: 'suite'
+  ...
+# Subtest: Best Buy scraper — getStockStatusFromApi
+    # Subtest: returns in_stock when onlineAvailability is true
+    ok 1 - returns in_stock when onlineAvailability is true
+      ---
+      duration_ms: 1.983234
+      ...
+    # Subtest: returns in_stock when only inStoreAvailability is true
+    ok 2 - returns in_stock when only inStoreAvailability is true
+      ---
+      duration_ms: 0.272142
+      ...
+    # Subtest: returns pre_order when preorderable is true
+    ok 3 - returns pre_order when preorderable is true
+      ---
+      duration_ms: 0.401609
+      ...
+    # Subtest: returns pre_order from onlineAvailabilityText "Coming Soon"
+    ok 4 - returns pre_order from onlineAvailabilityText "Coming Soon"
+      ---
+      duration_ms: 0.272248
+      ...
+    # Subtest: returns out_of_stock when not available anywhere
+    ok 5 - returns out_of_stock when not available anywhere
+      ---
+      duration_ms: 0.229035
+      ...
+    1..5
+ok 8 - Best Buy scraper — getStockStatusFromApi
+  ---
+  duration_ms: 5.439253
+  type: 'suite'
+  ...
+# Subtest: Best Buy scraper — normalizeApiItem
+    # Subtest: produces correct shape for in-stock item
+    ok 1 - produces correct shape for in-stock item
+      ---
+      duration_ms: 0.564612
+      ...
+    # Subtest: shows regularPrice when salePrice differs
+    ok 2 - shows regularPrice when salePrice differs
+      ---
+      duration_ms: 0.341825
+      ...
+    # Subtest: handles null salePrice gracefully
+    ok 3 - handles null salePrice gracefully
+      ---
+      duration_ms: 0.474514
+      ...
+    # Subtest: sets releaseDate from API field
+    ok 4 - sets releaseDate from API field
+      ---
+      duration_ms: 0.460149
+      ...
+    1..4
+ok 9 - Best Buy scraper — normalizeApiItem
+  ---
+  duration_ms: 2.685987
+  type: 'suite'
+  ...
+# Subtest: Best Buy scraper — parseHtmlProducts
+    # Subtest: extracts Pokemon products and skips non-Pokemon
+    ok 1 - extracts Pokemon products and skips non-Pokemon
+      ---
+      duration_ms: 20.367469
+      ...
+    # Subtest: sets in_stock when Add to Cart button is present
+    ok 2 - sets in_stock when Add to Cart button is present
+      ---
+      duration_ms: 3.654536
+      ...
+    # Subtest: sets pre_order when button says Pre-Order
+    ok 3 - sets pre_order when button says Pre-Order
+      ---
+      duration_ms: 2.367293
+      ...
+    # Subtest: deduplicates by SKU using the seen set
+    ok 4 - deduplicates by SKU using the seen set
+      ---
+      duration_ms: 4.994414
+      ...
+    # Subtest: extracts price correctly
+    ok 5 - extracts price correctly
+      ---
+      duration_ms: 2.117202
+      ...
+    1..5
+ok 10 - Best Buy scraper — parseHtmlProducts
+  ---
+  duration_ms: 33.954652
+  type: 'suite'
+  ...
+# Subtest: Best Buy scraper — isPokemonProduct
+    # Subtest: matches "pokemon" case-insensitively
+    ok 1 - matches "pokemon" case-insensitively
+      ---
+      duration_ms: 0.252196
+      ...
+    # Subtest: matches "pokémon" with accent
+    ok 2 - matches "pokémon" with accent
+      ---
+      duration_ms: 0.145719
+      ...
+    # Subtest: returns false for non-Pokemon items
+    ok 3 - returns false for non-Pokemon items
+      ---
+      duration_ms: 0.097002
+      ...
+    1..3
+ok 11 - Best Buy scraper — isPokemonProduct
+  ---
+  duration_ms: 0.711518
+  type: 'suite'
+  ...
+# Subtest: Target scraper — normalizeProduct
+    # Subtest: produces correct shape for in-stock item
+    ok 1 - produces correct shape for in-stock item
+      ---
+      duration_ms: 4.23013
+      ...
+    # Subtest: sets inStock=false for out_of_stock
+    ok 2 - sets inStock=false for out_of_stock
+      ---
+      duration_ms: 0.378091
+      ...
+    # Subtest: sets inStock=false for pre_order
+    ok 3 - sets inStock=false for pre_order
+      ---
+      duration_ms: 0.347896
+      ...
+    # Subtest: shows regularPrice when it differs from current price
+    ok 4 - shows regularPrice when it differs from current price
+      ---
+      duration_ms: 0.581756
+      ...
+    # Subtest: decodes HTML numeric entities in title
+    ok 5 - decodes HTML numeric entities in title
+      ---
+      duration_ms: 0.393935
+      ...
+    # Subtest: falls back to tcin-based URL when buy_url is absent
+    ok 6 - falls back to tcin-based URL when buy_url is absent
+      ---
+      duration_ms: 0.564799
+      ...
+    # Subtest: formats N/A price when current_retail is null
+    ok 7 - formats N/A price when current_retail is null
+      ---
+      duration_ms: 0.430851
+      ...
+    1..7
+ok 12 - Target scraper — normalizeProduct
+  ---
+  duration_ms: 14.688211
+  type: 'suite'
+  ...
+# Subtest: Target scraper — isSoldByTarget
+    # Subtest: returns true for first-party item
+    ok 1 - returns true for first-party item
+      ---
+      duration_ms: 0.6411
+      ...
+    # Subtest: returns false when is_marketplace is true
+    ok 2 - returns false when is_marketplace is true
+      ---
+      duration_ms: 0.673328
+      ...
+    # Subtest: returns false for TargetPlus relationship type
+    ok 3 - returns false for TargetPlus relationship type
+      ---
+      duration_ms: 1.675356
+      ...
+    1..3
+ok 13 - Target scraper — isSoldByTarget
+  ---
+  duration_ms: 4.040737
+  type: 'suite'
+  ...
+# Subtest: Target scraper — isPreOrder
+    # Subtest: returns false for normal in-stock items
+    ok 1 - returns false for normal in-stock items
+      ---
+      duration_ms: 0.583415
+      ...
+    # Subtest: returns true when formatted_current_price_type is pre_order
+    ok 2 - returns true when formatted_current_price_type is pre_order
+      ---
+      duration_ms: 0.232676
+      ...
+    # Subtest: returns true when formatted_current_price_type is preorder
+    ok 3 - returns true when formatted_current_price_type is preorder
+      ---
+      duration_ms: 0.176287
+      ...
+    1..3
+ok 14 - Target scraper — isPreOrder
+  ---
+  duration_ms: 1.316946
+  type: 'suite'
+  ...
+# Subtest: Walmart scraper — parseNextData
+    # Subtest: extracts __NEXT_DATA__ from HTML
+    ok 1 - extracts __NEXT_DATA__ from HTML
+      ---
+      duration_ms: 3.130633
+      ...
+    # Subtest: returns null when script tag is absent
+    ok 2 - returns null when script tag is absent
+      ---
+      duration_ms: 12.212573
+      ...
+    # Subtest: returns null when JSON is malformed
+    ok 3 - returns null when JSON is malformed
+      ---
+      duration_ms: 0.960742
+      ...
+    1..3
+ok 15 - Walmart scraper — parseNextData
+  ---
+  duration_ms: 18.687648
+  type: 'suite'
+  ...
+# Subtest: Walmart scraper — extractItems
+    # Subtest: returns items from itemStacks
+    ok 1 - returns items from itemStacks
+      ---
+      duration_ms: 0.713988
+      ...
+    # Subtest: returns empty array when no itemStacks
+    ok 2 - returns empty array when no itemStacks
+      ---
+      duration_ms: 1.065726
+      ...
+    1..2
+ok 16 - Walmart scraper — extractItems
+  ---
+  duration_ms: 2.299642
+  type: 'suite'
+  ...
+# Subtest: Walmart scraper — isSoldByWalmart
+    # Subtest: returns true for Walmart.com seller name
+    ok 1 - returns true for Walmart.com seller name
+      ---
+      duration_ms: 0.744486
+      ...
+    # Subtest: returns true matching by sellerId when name differs
+    ok 2 - returns true matching by sellerId when name differs
+      ---
+      duration_ms: 1.778282
+      ...
+    # Subtest: returns false for third-party seller
+    ok 3 - returns false for third-party seller
+      ---
+      duration_ms: 1.180246
+      ...
+    1..3
+ok 17 - Walmart scraper — isSoldByWalmart
+  ---
+  duration_ms: 5.782847
+  type: 'suite'
+  ...
+# Subtest: Walmart scraper — isPokemonProduct
+    # Subtest: matches items with "pokemon" in name
+    ok 1 - matches items with "pokemon" in name
+      ---
+      duration_ms: 0.61404
+      ...
+    # Subtest: matches "pokémon" with accent
+    ok 2 - matches "pokémon" with accent
+      ---
+      duration_ms: 0.594947
+      ...
+    # Subtest: rejects non-Pokemon items
+    ok 3 - rejects non-Pokemon items
+      ---
+      duration_ms: 2.519856
+      ...
+    1..3
+ok 18 - Walmart scraper — isPokemonProduct
+  ---
+  duration_ms: 5.6061
+  type: 'suite'
+  ...
+# Subtest: Walmart scraper — getStockStatus
+    # Subtest: returns in_stock when availabilityStatusV2 is IN_STOCK
+    ok 1 - returns in_stock when availabilityStatusV2 is IN_STOCK
+      ---
+      duration_ms: 3.39654
+      ...
+    # Subtest: returns out_of_stock when isOutOfStock is true
+    ok 2 - returns out_of_stock when isOutOfStock is true
+      ---
+      duration_ms: 0.234409
+      ...
+    # Subtest: returns out_of_stock when availabilityStatusV2 is OUT_OF_STOCK
+    ok 3 - returns out_of_stock when availabilityStatusV2 is OUT_OF_STOCK
+      ---
+      duration_ms: 0.170689
+      ...
+    # Subtest: returns pre_order when preOrder.isPreOrder is true
+    ok 4 - returns pre_order when preOrder.isPreOrder is true
+      ---
+      duration_ms: 0.158531
+      ...
+    # Subtest: returns in_stock when canAddToCart is true and no other signals
+    ok 5 - returns in_stock when canAddToCart is true and no other signals
+      ---
+      duration_ms: 0.171577
+      ...
+    1..5
+ok 19 - Walmart scraper — getStockStatus
+  ---
+  duration_ms: 4.525713
+  type: 'suite'
+  ...
+# Subtest: Walmart scraper — normalizeItem
+    # Subtest: produces the correct shape
+    ok 1 - produces the correct shape
+      ---
+      duration_ms: 0.594254
+      ...
+    # Subtest: includes regularPrice when wasPrice differs
+    ok 2 - includes regularPrice when wasPrice differs
+      ---
+      duration_ms: 0.285495
+      ...
+    1..2
+ok 20 - Walmart scraper — normalizeItem
+  ---
+  duration_ms: 1.047999
+  type: 'suite'
+  ...
+# Subtest: compareAndUpdate — new products
+    # Subtest: flags an in-stock product never seen before as new
+    ok 1 - flags an in-stock product never seen before as new
+      ---
+      duration_ms: 5.632387
+      ...
+    # Subtest: does not flag an OOS new product as new
+    ok 2 - does not flag an OOS new product as new
+      ---
+      duration_ms: 2.877252
+      ...
+    # Subtest: does not flag an already-seen in-stock product as new
+    ok 3 - does not flag an already-seen in-stock product as new
+      ---
+      duration_ms: 1.178285
+      ...
+    # Subtest: attaches msrp field from evaluateForNotification
+    ok 4 - attaches msrp field from evaluateForNotification
+      ---
+      duration_ms: 1.335138
+      ...
+    1..4
+ok 21 - compareAndUpdate — new products
+  ---
+  duration_ms: 13.609312
+  type: 'suite'
+  ...
+# Subtest: compareAndUpdate — restocks
+    # Subtest: flags out_of_stock → in_stock as a restock
+    ok 1 - flags out_of_stock → in_stock as a restock
+      ---
+      duration_ms: 0.728729
+      ...
+    # Subtest: flags pre_order → in_stock as a restock
+    ok 2 - flags pre_order → in_stock as a restock
+      ---
+      duration_ms: 0.473907
+      ...
+    # Subtest: does NOT flag in_stock → in_stock as a restock
+    ok 3 - does NOT flag in_stock → in_stock as a restock
+      ---
+      duration_ms: 0.384239
+      ...
+    # Subtest: does NOT flag out_of_stock → out_of_stock as anything
+    ok 4 - does NOT flag out_of_stock → out_of_stock as anything
+      ---
+      duration_ms: 0.476434
+      ...
+    1..4
+ok 22 - compareAndUpdate — restocks
+  ---
+  duration_ms: 2.725268
+  type: 'suite'
+  ...
+# Subtest: compareAndUpdate — MSRP price gate
+    # Subtest: blocks new products priced above 120% of MSRP
+    not ok 1 - blocks new products priced above 120% of MSRP
+      ---
+      duration_ms: 3.132167
+      location: '/Users/anthonyholder/Documents/ChatGPT/🃏 P R O C U R E M E N T/upstream-pokemon-restock/tests/stateManager.test.js:114:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        
+        1 !== 0
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 0
+      actual: 1
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (/Users/anthonyholder/Documents/ChatGPT/🃏 P R O C U R E M E N T/upstream-pokemon-restock/tests/stateManager.test.js:120:12)
+        Test.runInAsyncScope (node:async_hooks:206:9)
+        Test.run (node:internal/test_runner/test:824:25)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1183:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:533:7)
+      ...
+    # Subtest: allows new products at exactly 120% of MSRP
+    ok 2 - allows new products at exactly 120% of MSRP
+      ---
+      duration_ms: 0.656547
+      ...
+    # Subtest: passes when no MSRP match is found
+    ok 3 - passes when no MSRP match is found
+      ---
+      duration_ms: 0.487239
+      ...
+    # Subtest: passes when product has no numeric price
+    ok 4 - passes when product has no numeric price
+      ---
+      duration_ms: 0.353915
+      ...
+    1..4
+not ok 23 - compareAndUpdate — MSRP price gate
+  ---
+  duration_ms: 5.260029
+  type: 'suite'
+  location: '/Users/anthonyholder/Documents/ChatGPT/🃏 P R O C U R E M E N T/upstream-pokemon-restock/tests/stateManager.test.js:113:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: compareAndUpdate — keyword filter
+    # Subtest: blocks products whose name does not match any filterKeyword
+    ok 1 - blocks products whose name does not match any filterKeyword
+      ---
+      duration_ms: 0.585026
+      ...
+    # Subtest: allows products whose name matches a filterKeyword
+    ok 2 - allows products whose name matches a filterKeyword
+      ---
+      duration_ms: 0.542868
+      ...
+    # Subtest: allows all products when filterKeywords is empty
+    ok 3 - allows all products when filterKeywords is empty
+      ---
+      duration_ms: 0.362864
+      ...
+    1..3
+ok 24 - compareAndUpdate — keyword filter
+  ---
+  duration_ms: 1.732607
+  type: 'suite'
+  ...
+# Subtest: compareAndUpdate — state mutation
+    # Subtest: adds new product to state
+    ok 1 - adds new product to state
+      ---
+      duration_ms: 0.391001
+      ...
+    # Subtest: updates lastStockStatus on known product
+    ok 2 - updates lastStockStatus on known product
+      ---
+      duration_ms: 0.350993
+      ...
+    1..2
+ok 25 - compareAndUpdate — state mutation
+  ---
+  duration_ms: 0.887072
+  type: 'suite'
+  ...
+# Subtest: summarizeState
+    # Subtest: returns per-retailer totals
+    ok 1 - returns per-retailer totals
+      ---
+      duration_ms: 0.665936
+      ...
+    1..1
+ok 26 - summarizeState
+  ---
+  duration_ms: 0.821824
+  type: 'suite'
+  ...
+# Subtest: withRetry
+    # Subtest: returns value immediately on first success
+    ok 1 - returns value immediately on first success
+      ---
+      duration_ms: 2.364978
+      ...
+    # Subtest: retries on failure and returns value on eventual success
+    ok 2 - retries on failure and returns value on eventual success
+      ---
+      duration_ms: 14.794509
+      ...
+    # Subtest: throws after exhausting all attempts
+    ok 3 - throws after exhausting all attempts
+      ---
+      duration_ms: 4.780128
+      ...
+    # Subtest: rethrows immediately when isRetryable returns false
+    ok 4 - rethrows immediately when isRetryable returns false
+      ---
+      duration_ms: 0.661746
+      ...
+    # Subtest: passes attempt number to fn
+    ok 5 - passes attempt number to fn
+      ---
+      duration_ms: 5.367586
+      ...
+    # Subtest: calls onRetry before each sleep
+    ok 6 - calls onRetry before each sleep
+      ---
+      duration_ms: 4.158909
+      ...
+    # Subtest: uses exponential backoff by default
+    ok 7 - uses exponential backoff by default
+      ---
+      duration_ms: 706.07731
+      ...
+    # Subtest: uses custom getDelay when provided
+    ok 8 - uses custom getDelay when provided
+      ---
+      duration_ms: 158.440657
+      ...
+    1..8
+ok 27 - withRetry
+  ---
+  duration_ms: 899.646551
+  type: 'suite'
+  ...
+1..27
+# tests 115
+# suites 27
+# pass 114
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2204.460695
