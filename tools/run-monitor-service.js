@@ -79,7 +79,7 @@ function openApiSpec(req) {
         post: {
           operationId: 'run_monitor',
           summary: 'Run the safe Pokemon restock monitor dry-run and return chart-ready results',
-          description: 'Runs a broad read-only retail observation sweep with notifications disabled and no persistent state mutation, then enriches verified direct listings with independent market evidence. The response includes visual_summary, a chart-ready payload for source health, procurement funnel, and market opportunity graphs. Use visual_summary to render charts or compact text bars after every run.',
+          description: 'Runs a safe read-only retail sweep with notifications and persistence disabled. Returns observations, market evidence, opportunity candidates, and chart-ready visual_summary for source health, funnel, and market opportunity graphs.',
           security: [{ bearerAuth: [] }],
           responses: {
             200: {
