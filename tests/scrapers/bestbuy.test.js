@@ -1,6 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  scrapeBestBuy,
   getStockStatusFromApi,
   normalizeApiItem,
   parseHtmlProducts,
@@ -46,6 +47,15 @@ describe('Best Buy scraper — getStockStatusFromApi', () => {
     assert.equal(
       getStockStatusFromApi(makeApiItem({ onlineAvailability: false, inStoreAvailability: false, onlineAvailabilityText: 'Sold Out' })),
       'out_of_stock',
+    );
+  });
+});
+
+describe('Best Buy scraper — access gate', () => {
+  it('fails fast as credentials_missing when no API key is configured', async () => {
+    await assert.rejects(
+      () => scrapeBestBuy(),
+      err => err.sourceStatus === 'credentials_missing' && err.message === 'Missing BESTBUY_API_KEY',
     );
   });
 });

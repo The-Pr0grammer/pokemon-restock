@@ -99,12 +99,14 @@ async function fetchApiPage(apiKey, query, page, signal) {
         if (status === 403) {
           const e = new Error('[Best Buy] API key rejected (403). Check BESTBUY_API_KEY.');
           e.permanent = true;
+          e.sourceStatus = 'credentials_invalid';
           throw e;
         }
         if (status === 400) {
           const msg = err.response?.data?.error?.message ?? 'Bad Request';
           const e   = new Error(`[Best Buy] API 400: ${msg}`);
           e.permanent = true;
+          e.sourceStatus = 'credentials_invalid';
           throw e;
         }
         throw err;
@@ -391,14 +393,19 @@ async function scrapeViaHtml(signal) {
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
 async function scrapeBestBuy({ signal } = {}) {
-  const apiKey = config.retailers.bestbuy.apiKey;
+  const { apiKey, allowHtmlFallback } = config.retailers.bestbuy;
 
   let products;
   if (apiKey) {
     console.log('[Best Buy] Starting — API mode');
     products = await scrapeViaApi(apiKey, signal);
+  } else if (!allowHtmlFallback) {
+    const err = new Error('Missing BESTBUY_API_KEY');
+    err.code = 'CREDENTIALS_MISSING';
+    err.sourceStatus = 'credentials_missing';
+    throw err;
   } else {
-    console.log('[Best Buy] Starting — HTML fallback mode (set BESTBUY_API_KEY for better results)');
+    console.log('[Best Buy] Starting — explicitly enabled HTML fallback mode (set BESTBUY_API_KEY for production results)');
     products = await scrapeViaHtml(signal);
   }
 

@@ -524,12 +524,13 @@ All options are set via environment variables (`.env` locally, Secrets/Variables
 | `WALMART_ENABLED` | `true` | Enable Walmart scraping |
 | `BESTBUY_ENABLED` | `true` | Enable Best Buy scraping |
 | `BESTBUY_API_KEY` | — | Best Buy Products API key (free) |
+| `BESTBUY_HTML_FALLBACK_ENABLED` | `false` | Maintenance-only HTML fallback when no API key is set |
 | `AMAZON_ENABLED` | `true` | Enable Amazon scraping |
 | `AMAZON_ACCESS_KEY` | — | PA API access key ID |
 | `AMAZON_SECRET_KEY` | — | PA API secret access key |
 | `AMAZON_PARTNER_TAG` | — | Amazon Associates tag |
 | `AMAZON_FBA_ONLY` | `false` | `true` to include FBA 3rd-party sellers |
-| `GAMESTOP_ENABLED` | `false` | Enable GameStop (requires residential IP) |
+| `GAMESTOP_ENABLED` | `true` | Enable GameStop; hosted runs may report `blocked` |
 | `BN_ENABLED` | `true` | Enable Barnes & Noble scraping |
 | `PC_ENABLED` | `true` | Enable Pokemon Center queue monitoring |
 | `PC_COOKIE` | — | Browser session cookie for PC product scraping |

@@ -54,6 +54,7 @@ module.exports = {
       name: 'Best Buy',
       color: 0xffe000,
       apiKey: process.env.BESTBUY_API_KEY || '',
+      allowHtmlFallback: process.env.BESTBUY_HTML_FALLBACK_ENABLED === 'true',
       keywords,
     },
     amazon: {

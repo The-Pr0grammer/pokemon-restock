@@ -48,6 +48,7 @@ jobs:
       TARGET_ENABLED:   ${{ vars.TARGET_ENABLED   || 'true' }}
       WALMART_ENABLED:  ${{ vars.WALMART_ENABLED  || 'true' }}
       BESTBUY_ENABLED:  ${{ vars.BESTBUY_ENABLED  || 'true' }}
+      BESTBUY_HTML_FALLBACK_ENABLED: ${{ vars.BESTBUY_HTML_FALLBACK_ENABLED || 'false' }}
 
       # Retailers — new
       AMAZON_ENABLED:      ${{ vars.AMAZON_ENABLED      || 'true' }}
