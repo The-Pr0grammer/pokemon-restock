@@ -1,5 +1,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const zlib = require('zlib');
 const {
   parseNextData,
   extractItems,
@@ -7,6 +8,11 @@ const {
   isPokemonProduct,
   getStockStatus,
   normalizeItem,
+  isPokemonTcgProductName,
+  parseSnapshotRecords,
+  isFirstPartySnapshotRecord,
+  normalizeSnapshotRecord,
+  scrapeWalmartCatalogSnapshot,
 } = require('../../scrapers/walmart');
 
 const WALMART_SELLER_ID = 'F55CDC31AB754BB68FE0B39041159D63';
@@ -146,5 +152,85 @@ describe('Walmart scraper — normalizeItem', () => {
   it('includes regularPrice when wasPrice differs', () => {
     const p = normalizeItem(makeItem({ priceInfo: { linePrice: '$4.49', wasPrice: '$4.99' } }));
     assert.equal(p.regularPrice, '$4.99');
+  });
+});
+
+describe('Walmart I/O catalog snapshot adapter', () => {
+  it('requires Walmart API credentials before calling OAuth', async () => {
+    await assert.rejects(
+      () => scrapeWalmartCatalogSnapshot({ walmartConfig: { consumerId: '', clientSecret: '' } }),
+      err => err.sourceStatus === 'credentials_missing',
+    );
+  });
+
+  it('recognizes Pokemon TCG names without matching generic Pokemon toys', () => {
+    assert.equal(isPokemonTcgProductName('Pokemon TCG Scarlet & Violet Booster Bundle'), true);
+    assert.equal(isPokemonTcgProductName('Pokemon Plush Pikachu 8 inch'), false);
+  });
+
+  it('parses newline-delimited snapshot records', () => {
+    assert.deepEqual(parseSnapshotRecords('{"itemId":1}\n{"itemId":2}\n').map(r => r.itemId), [1, 2]);
+  });
+
+  it('filters marketplace snapshot records', () => {
+    assert.equal(isFirstPartySnapshotRecord({ marketplace: false, sellerInfo: 'Walmart.com' }), true);
+    assert.equal(isFirstPartySnapshotRecord({ marketplace: true, sellerInfo: 'ToyMart' }), false);
+  });
+
+  it('normalizes first-party snapshot records', () => {
+    const product = normalizeSnapshotRecord({
+      itemId: 123,
+      name: 'Pokemon TCG Booster Bundle',
+      salePrice: 24.99,
+      msrp: 29.99,
+      availableOnline: true,
+      stock: 'Available',
+      productTrackingUrl: 'https://goto.walmart.com/c/x?u=https%3A%2F%2Fwww.walmart.com%2Fip%2F123',
+      gtin: '000123',
+    });
+
+    assert.equal(product.id, 'walmart-123');
+    assert.equal(product.priceNumeric, 24.99);
+    assert.equal(product.stockStatus, 'in_stock');
+    assert.equal(product.sellerType, 'first_party');
+    assert.equal(product.url, 'https://www.walmart.com/ip/123');
+  });
+
+  it('fetches OAuth, snapshot URLs, and gzipped feed parts', async () => {
+    const records = [
+      { itemId: 1, name: 'Pokemon TCG Elite Trainer Box', salePrice: 49.99, availableOnline: true, stock: 'Available', marketplace: false, sellerInfo: 'Walmart.com' },
+      { itemId: 2, name: 'Pokemon Plush', salePrice: 14.99, availableOnline: true, stock: 'Available', marketplace: false, sellerInfo: 'Walmart.com' },
+      { itemId: 3, name: 'Pokemon TCG Booster Pack', salePrice: 4.49, availableOnline: true, stock: 'Available', marketplace: true, sellerInfo: 'ToyMart' },
+    ];
+    const gzipped = zlib.gzipSync(records.map(record => JSON.stringify(record)).join('\n'));
+    const calls = [];
+    const client = {
+      async post(url, body, options) {
+        calls.push({ method: 'POST', url, body, options });
+        return { data: { access_token: 'token-123' } };
+      },
+      async get(url, options) {
+        calls.push({ method: 'GET', url, options });
+        if (url.includes('/feeds/items')) return { data: { product_snapshot_data: ['https://storage.googleapis.com/feed.json.gz'] } };
+        return { data: gzipped };
+      },
+    };
+
+    const products = await scrapeWalmartCatalogSnapshot({
+      client,
+      walmartConfig: {
+        consumerId: 'consumer',
+        clientSecret: 'secret',
+        categoryId: '4171',
+        feedType: '',
+        maxFeedParts: 1,
+      },
+    });
+
+    assert.equal(products.length, 1);
+    assert.equal(products[0].name, 'Pokemon TCG Elite Trainer Box');
+    assert.equal(calls[0].options.headers['wm_consumer.id'], 'consumer');
+    assert.equal(calls[1].options.headers.authorization, 'Bearer token-123');
+    assert.equal(calls[1].options.params.categoryId, '4171');
   });
 });

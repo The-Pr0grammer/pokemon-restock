@@ -47,6 +47,12 @@ module.exports = {
       enabled: process.env.WALMART_ENABLED !== 'false',
       name: 'Walmart',
       color: 0x0071ce,
+      apiEnabled: process.env.WALMART_API_ENABLED === 'true',
+      consumerId: process.env.WALMART_CONSUMER_ID || '',
+      clientSecret: process.env.WALMART_CLIENT_SECRET || '',
+      categoryId: process.env.WALMART_CATEGORY_ID || '',
+      feedType: process.env.WALMART_FEED_TYPE || '',
+      maxFeedParts: parseInt(process.env.WALMART_MAX_FEED_PARTS || '2', 10),
       keywords,
     },
     bestbuy: {

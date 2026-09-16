@@ -398,6 +398,7 @@ Click **New repository variable** for optional overrides:
 | `NOTIFY_CHANNELS` | `discord` | `discord`, `email`, or `discord,email` |
 | `TARGET_ENABLED` | `true` | Set to `false` to disable Target |
 | `WALMART_ENABLED` | `true` | Set to `false` to disable Walmart |
+| `WALMART_API_ENABLED` | `false` | Set to `true` to use Walmart I/O Product Catalog Snapshot API |
 | `BESTBUY_ENABLED` | `true` | Set to `false` to disable Best Buy |
 | `AMAZON_ENABLED` | `true` | Set to `false` to disable Amazon |
 | `AMAZON_FBA_ONLY` | `false` | `true` to include 3rd-party FBA/Prime sellers; `false` = Amazon.com only |
@@ -524,6 +525,12 @@ All options are set via environment variables (`.env` locally, Secrets/Variables
 |----------|---------|-------------|
 | `TARGET_ENABLED` | `true` | Enable Target scraping |
 | `WALMART_ENABLED` | `true` | Enable Walmart scraping |
+| `WALMART_API_ENABLED` | `false` | Use Walmart I/O Product Catalog Snapshot API instead of web search scraping |
+| `WALMART_CONSUMER_ID` | — | Walmart I/O consumer/client ID |
+| `WALMART_CLIENT_SECRET` | — | Walmart I/O IAM client secret |
+| `WALMART_CATEGORY_ID` | — | Optional catalog category filter for snapshot feed |
+| `WALMART_FEED_TYPE` | — | Optional feed type; leave empty for Walmart offers only, `catalog` includes marketplace offers |
+| `WALMART_MAX_FEED_PARTS` | `2` | Max gzipped snapshot parts to download per run |
 | `BESTBUY_ENABLED` | `true` | Enable Best Buy scraping |
 | `BESTBUY_API_KEY` | — | Best Buy Products API key (free) |
 | `BESTBUY_HTML_FALLBACK_ENABLED` | `false` | Maintenance-only HTML fallback when no API key is set |

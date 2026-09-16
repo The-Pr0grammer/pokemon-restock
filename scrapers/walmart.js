@@ -24,6 +24,7 @@
  */
 
 const axios = require('axios');
+const zlib = require('zlib');
 const config = require('../config');
 const { withRetry, sleep, throwIfAborted } = require('../utils/retry');
 
@@ -31,6 +32,7 @@ const { withRetry, sleep, throwIfAborted } = require('../utils/retry');
 
 const WALMART_BASE   = 'https://www.walmart.com';
 const SEARCH_URL     = `${WALMART_BASE}/search`;
+const WALMART_IO_BASE = 'https://developer.api.walmart.com/api-proxy/service';
 
 // Walmart's own seller ID in their marketplace system — used as backup filter.
 const WALMART_SELLER_ID = 'F55CDC31AB754BB68FE0B39041159D63';
@@ -171,6 +173,12 @@ function isPokemonProduct(item) {
       || (item.name ?? '').toLowerCase().includes('pokémon');
 }
 
+function isPokemonTcgProductName(name) {
+  const text = String(name || '').toLowerCase();
+  if (!text.includes('pokemon') && !text.includes('pokémon')) return false;
+  return /\b(tcg|trading card|booster|elite trainer|\betb\b|tin|collection|bundle|deck|card game|cards?)\b/.test(text);
+}
+
 // ── Stock status ──────────────────────────────────────────────────────────────
 
 /**
@@ -252,9 +260,168 @@ function normalizeItem(item) {
   };
 }
 
+function ensureWalmartApiCredentials(walmartConfig = config.retailers.walmart) {
+  const missing = [];
+  if (!walmartConfig.consumerId) missing.push('WALMART_CONSUMER_ID');
+  if (!walmartConfig.clientSecret) missing.push('WALMART_CLIENT_SECRET');
+  if (missing.length) {
+    const err = new Error(`[Walmart] Missing API credentials: ${missing.join(', ')}`);
+    err.sourceStatus = 'credentials_missing';
+    throw err;
+  }
+}
+
+async function fetchWalmartAccessToken({ signal, walmartConfig = config.retailers.walmart, client = axios } = {}) {
+  ensureWalmartApiCredentials(walmartConfig);
+  const response = await client.post(
+    `${WALMART_IO_BASE}/identity/oauth/v1/token`,
+    new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: walmartConfig.consumerId,
+      client_secret: walmartConfig.clientSecret,
+    }).toString(),
+    {
+      headers: {
+        'cache-control': 'no-cache',
+        'content-type': 'application/x-www-form-urlencoded',
+        'wm_consumer.id': walmartConfig.consumerId,
+      },
+      timeout: 15000,
+      signal,
+    },
+  );
+  return response.data?.access_token;
+}
+
+async function fetchWalmartSnapshotUrls(token, { signal, walmartConfig = config.retailers.walmart, client = axios } = {}) {
+  const params = {};
+  if (walmartConfig.categoryId) params.categoryId = walmartConfig.categoryId;
+  if (walmartConfig.feedType) params.feedType = walmartConfig.feedType;
+
+  const response = await client.get(`${WALMART_IO_BASE}/affil/catalog-api/v2/product/feeds/items`, {
+    params,
+    headers: {
+      'content-type': 'application/json',
+      'wm_consumer.id': walmartConfig.consumerId,
+      authorization: `Bearer ${token}`,
+    },
+    timeout: 15000,
+    signal,
+  });
+  return response.data?.product_snapshot_data || [];
+}
+
+async function downloadSnapshotPart(url, { signal, client = axios } = {}) {
+  const response = await client.get(url, {
+    responseType: 'arraybuffer',
+    timeout: 30000,
+    signal,
+  });
+  const buffer = Buffer.from(response.data);
+  return zlib.gunzipSync(buffer).toString('utf8');
+}
+
+function parseSnapshotRecords(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return trimmed
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => JSON.parse(line));
+  }
+}
+
+function isFirstPartySnapshotRecord(record) {
+  if (record.marketplace === true) return false;
+  if (record.sellerInfo && record.sellerInfo !== 'Walmart.com') return false;
+  return true;
+}
+
+function getSnapshotStockStatus(record) {
+  if (record.preOrder === true) return 'pre_order';
+  if (record.availableOnline === true && record.stock !== 'Not available') return 'in_stock';
+  return 'out_of_stock';
+}
+
+function normalizeSnapshotRecord(record) {
+  const itemId = String(record.itemId || record.parentItemId || record.productId || '');
+  const priceNumeric = Number(record.salePrice);
+  const stockStatus = getSnapshotStockStatus(record);
+  const productUrl = record.productTrackingUrl
+    ? decodeURIComponent(String(record.productTrackingUrl).split('u=')[1] || '')
+    : `${WALMART_BASE}/ip/${itemId}`;
+
+  return {
+    id: `walmart-${itemId}`,
+    retailer: 'walmart',
+    usItemId: itemId,
+    name: record.name || '',
+    brand: record.manufacturer || null,
+    price: Number.isFinite(priceNumeric) ? `$${priceNumeric.toFixed(2)}` : 'N/A',
+    priceNumeric: Number.isFinite(priceNumeric) ? priceNumeric : null,
+    regularPrice: Number.isFinite(Number(record.msrp)) ? `$${Number(record.msrp).toFixed(2)}` : null,
+    url: productUrl || `${WALMART_BASE}/ip/${itemId}`,
+    inStock: stockStatus === 'in_stock',
+    stockStatus,
+    pickupStatus: null,
+    releaseDate: record.preOrderShipsOn || null,
+    sellerName: 'Walmart.com',
+    sellerType: 'first_party',
+    gtin: record.gtin || record.upc || null,
+  };
+}
+
+async function scrapeWalmartCatalogSnapshot({ signal, client = axios, walmartConfig = config.retailers.walmart } = {}) {
+  ensureWalmartApiCredentials(walmartConfig);
+  console.log('[Walmart] Fetching Walmart I/O catalog snapshot feed...');
+  const token = await fetchWalmartAccessToken({ signal, walmartConfig, client });
+  if (!token) {
+    const err = new Error('[Walmart] OAuth response did not include access_token');
+    err.sourceStatus = 'credentials_invalid';
+    throw err;
+  }
+
+  const urls = await fetchWalmartSnapshotUrls(token, { signal, walmartConfig, client });
+  if (!urls.length) return [];
+
+  const products = [];
+  const seen = new Set();
+  const maxParts = Math.max(1, walmartConfig.maxFeedParts || 1);
+
+  for (const url of urls.slice(0, maxParts)) {
+    throwIfAborted(signal);
+    const text = await downloadSnapshotPart(url, { signal, client });
+    for (const record of parseSnapshotRecords(text)) {
+      if (!record?.itemId || seen.has(String(record.itemId))) continue;
+      seen.add(String(record.itemId));
+      if (!isFirstPartySnapshotRecord(record)) continue;
+      if (!isPokemonTcgProductName(record.name)) continue;
+      products.push(normalizeSnapshotRecord(record));
+    }
+  }
+
+  console.log(`[Walmart] Catalog snapshot yielded ${products.length} first-party Pokemon TCG product(s)`);
+  return products;
+}
+
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
 async function scrapeWalmart({ signal } = {}) {
+  if (config.retailers.walmart.apiEnabled) {
+    try {
+      return await scrapeWalmartCatalogSnapshot({ signal });
+    } catch (err) {
+      if (err.response?.status === 401) err.sourceStatus = 'credentials_invalid';
+      if (err.response?.status === 403) err.sourceStatus = 'blocked';
+      throw err;
+    }
+  }
+
   console.log('[Walmart] Initialising session…');
   let cookies;
   try {
@@ -424,4 +591,11 @@ module.exports = {
   isPokemonProduct,
   getStockStatus,
   normalizeItem,
+  isPokemonTcgProductName,
+  fetchWalmartAccessToken,
+  fetchWalmartSnapshotUrls,
+  parseSnapshotRecords,
+  isFirstPartySnapshotRecord,
+  normalizeSnapshotRecord,
+  scrapeWalmartCatalogSnapshot,
 };
