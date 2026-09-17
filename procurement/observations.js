@@ -123,6 +123,9 @@ function normalizeAvailability(value) {
   const raw = String(value || '').trim();
   if (!raw) return { availability: 'unknown', hasEvidence: false, raw_status: null };
   const text = raw.toLowerCase();
+  if (/\b(?:add to cart|buy now)\s+(?:is\s+)?disabled\b/.test(text)) {
+    return { availability: 'unknown', hasEvidence: false, raw_status: raw };
+  }
   if (/\b(pre[-\s]?order|preorder|coming soon)\b/.test(text)) return { availability: 'pre_order', hasEvidence: true, raw_status: raw };
   if (/\b(out of stock|sold out|unavailable|not available|currently unavailable)\b/.test(text)) {
     return { availability: 'out_of_stock', hasEvidence: true, raw_status: raw };

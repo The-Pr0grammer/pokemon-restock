@@ -88,6 +88,16 @@ describe('analyzeExternalObservations', () => {
     assert.equal(result.opportunity_candidates.length, 0);
   });
 
+  it('does not treat a disabled add-to-cart control as stock evidence', async () => {
+    const result = await analyzeExternalObservations({
+      observations: [validListing({ availability_text: 'Add to Cart disabled' })],
+    });
+
+    assert.equal(result.observations[0].availability, 'unknown');
+    assert.equal(result.eligible_observations.length, 0);
+    assert.equal(result.rejected_items[0].reason, 'availability_evidence_missing');
+  });
+
   it('enriches valid first-party retail observations', async () => {
     const result = await analyzeExternalObservations({ observations: [validListing()] });
 

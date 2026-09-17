@@ -96,6 +96,21 @@ describe('observations dashboard visual summary', () => {
     ]);
   });
 
+  it('does not count rejected external listings as actionable', () => {
+    const summary = buildVisualSummary({
+      observations: [
+        { availability: 'in_stock', confidence: 'verified', procurement_eligible: false },
+        { availability: 'in_stock', confidence: 'verified', procurement_eligible: true },
+      ],
+      candidates: [],
+      sourceStatuses: { statuses: [] },
+      marketEstimates: [],
+      generatedAt: '2026-09-17T00:00:00.000Z',
+    });
+
+    assert.equal(summary.funnel.actionable, 1);
+  });
+
   it('renders self-contained charts, escaped labels, and detail tables', () => {
     const visualSummary = buildVisualSummary({
       observations,
