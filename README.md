@@ -125,9 +125,9 @@ Starts immediately, then repeats every 15 minutes using the built-in scheduler. 
 
 ---
 
-## `run_monitor` Bridge
+## GPT Action Bridge
 
-For ChatGPT/tool integration, the repo includes a minimal local HTTP bridge around the existing safe dry-run monitor:
+For ChatGPT/tool integration, the repo includes a minimal local HTTP bridge around the procurement engine:
 
 ```bash
 npm run serve:run-monitor
@@ -138,10 +138,46 @@ By default it binds to `127.0.0.1:8787`. When a host such as Render supplies `PO
 ```http
 GET /health
 GET /openapi.json
+POST /analyze_observations
 POST /run_monitor
 ```
 
-`GET /health` is for hosting checks only. `/openapi.json` intentionally advertises only `POST /run_monitor` to ChatGPT Actions.
+`GET /health` is for hosting checks only. `/openapi.json` advertises two actions:
+
+- `POST /analyze_observations` is the preferred GPT flow. GPT gathers public web listings, then submits them for normalization, rejection, market enrichment, opportunity scoring, and chart-ready output.
+- `POST /run_monitor` remains the autonomous internal-source sweep using the repo's retailer adapters.
+
+### `POST /analyze_observations`
+
+Submit externally gathered observations. The endpoint is intentionally not a scraping framework and does not do browser automation. It accepts listing facts such as source/retailer, product name, URL, price, seller, availability text, observed_at, identifiers, and verification metadata.
+
+Search-result presence is not stock evidence. Marketplace/third-party listings, duplicate observations, missing availability evidence, unverified search results, and observations without first-party seller evidence are returned in `rejected_items` and do not reach market enrichment.
+
+Example request:
+
+```json
+{
+  "observations": [
+    {
+      "source": "walmart",
+      "product_name": "Pokemon TCG Elite Trainer Box",
+      "url": "https://www.walmart.com/ip/example/123",
+      "price": 49.99,
+      "seller": "Walmart.com",
+      "seller_type": "first_party",
+      "availability_text": "In stock",
+      "observed_at": "2026-09-17T00:00:00.000Z",
+      "verification_state": "direct_product_page",
+      "confidence": "verified",
+      "identifiers": { "item_id": "123", "upc": "0820650856952" }
+    }
+  ]
+}
+```
+
+The response includes `observations`, `normalized_observations`, `eligible_observations`, `rejected_items`, `market_estimates`, `market_matches`, `opportunity_candidates`, `visual_summary`, and `native_chart_data`.
+
+### `POST /run_monitor`
 
 `POST /run_monitor` takes no body and no arbitrary command input. It executes the current safe Barnes & Noble dry-run observation slice, disables notifications, avoids state persistence, preserves source timeouts, and returns structured JSON:
 

@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const { buildVisualSummary } = require('./generate-observations-dashboard');
+const { analyzeExternalObservations } = require('../procurement/analyze-observations');
 
 process.env.NOTIFY_CHANNELS = '';
 process.env.EMAIL_ENABLED = 'false';
@@ -29,7 +30,7 @@ const { run } = require('../monitor');
 const app = express();
 const token = process.env.RUN_MONITOR_TOKEN || '';
 let activeRun = null;
-app.use(express.json({ limit: '1kb' }));
+app.use(express.json({ limit: '256kb' }));
 
 function isAuthorized(req) { return !token || req.get('authorization') === `Bearer ${token}`; }
 function sourcesFrom(statuses) { return statuses.map(({ source, status, productCount, elapsedMs, message }) => ({ source, status, product_count: productCount, elapsed_ms: elapsedMs, message })); }
@@ -84,17 +85,25 @@ function buildNativeChartData(visualSummary) {
 function openApiSpec(req) {
   return {
     openapi: '3.1.0',
-    info: { title: 'Pokemon Restock Monitor', version: '0.2.0', description: 'Runs the safe Pokemon opportunity sweep and returns source statuses, canonical observations, market estimates, opportunity candidates, chart-ready visual_summary, and native_chart_data containing explicit time-series rows for interactive line charts.' },
+    info: { title: 'Pokemon Restock Monitor', version: '0.3.0', description: 'Analyzes Pokemon retail observations. Preferred GPT flow: gather public listings first, submit them to analyze_observations, then trust the procurement engine for normalization, rejection reasons, market enrichment, opportunity candidates, and chart-ready visual/native chart data. run_monitor remains the autonomous internal-source sweep.' },
     servers: [{ url: publicBaseUrl(req) }],
-    paths: { '/run_monitor': { post: { operationId: 'run_monitor', summary: 'Run the safe Pokemon restock monitor dry-run and return chart-ready results', description: 'Runs a safe read-only retail sweep. For conversational price charts, use native_chart_data exactly as supplied: date is the x-axis and retail_price/market_price are y-series. Prefer interactive line charts with hover points; do not reduce time-series rows to two category bars.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Monitor completed with explicit chart-ready time-series data', content: { 'application/json': { schema: { $ref: '#/components/schemas/RunMonitorResponse' } } } }, 401: { description: 'Missing or invalid bearer token' }, 409: { description: 'A monitor run is already in progress' } } } } },
+    paths: {
+      '/analyze_observations': { post: { operationId: 'analyze_observations', summary: 'Analyze GPT-scavenged retail observations', description: 'Submit listings gathered from public web retrieval. The backend normalizes them into canonical observations, rejects duplicates, marketplace/third-party listings, missing availability evidence, and unverified search results before market enrichment. Search presence is not confirmed stock. Use the returned visual_summary and native_chart_data for conversational visuals.', security: [{ bearerAuth: [] }], requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/AnalyzeObservationsRequest' } } } }, responses: { 200: { description: 'Observations analyzed with rejection reasons, market matches, opportunity candidates, and chart-ready output', content: { 'application/json': { schema: { $ref: '#/components/schemas/AnalyzeObservationsResponse' } } } }, 401: { description: 'Missing or invalid bearer token' } } } },
+      '/run_monitor': { post: { operationId: 'run_monitor', summary: 'Run the autonomous internal-source sweep', description: 'Runs the safe read-only autonomous internal-source sweep through retailer adapters. Use analyze_observations when GPT has already gathered listings from the public web. For conversational price charts, use native_chart_data exactly as supplied: date is the x-axis and retail_price/market_price are y-series. Prefer interactive line charts with hover points; do not reduce time-series rows to two category bars.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Monitor completed with explicit chart-ready time-series data', content: { 'application/json': { schema: { $ref: '#/components/schemas/RunMonitorResponse' } } } }, 401: { description: 'Missing or invalid bearer token' }, 409: { description: 'A monitor run is already in progress' } } } },
+    },
     components: {
       securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } },
       schemas: {
         SourceStatus: { type: 'object', properties: { source:{type:'string'}, status:{type:'string'}, product_count:{type:'integer'}, elapsed_ms:{type:['integer','null']}, message:{type:['string','null']} } },
+        ExternalObservationInput: { type:'object', additionalProperties:true, properties:{ source:{type:'string',description:'Retailer/source key or name, e.g. walmart, Target, Barnes & Noble'}, product_name:{type:'string'}, name:{type:'string'}, url:{type:'string'}, price:{type:['number','string']}, seller:{type:'string'}, seller_name:{type:'string'}, seller_type:{type:'string',enum:['first_party','marketplace','third_party','unknown']}, availability_text:{type:'string',description:'Visible availability evidence from the page. Search-result presence alone is not availability.'}, observed_at:{type:'string'}, identifiers:{type:'object',additionalProperties:true}, confidence:{type:'string'}, verification_state:{type:'string',enum:['direct_product_page','search_result','unverified','inferred']} } },
+        AnalyzeObservationsRequest: { type:'object', properties:{ observations:{type:'array',items:{$ref:'#/components/schemas/ExternalObservationInput'}}, listings:{type:'array',items:{$ref:'#/components/schemas/ExternalObservationInput'}} }, anyOf:[{required:['observations']},{required:['listings']}] },
         Observation: { type: 'object', additionalProperties: true },
+        RejectedItem: { type:'object', properties:{ index:{type:'integer'}, reason:{type:'string'}, reasons:{type:'array',items:{type:'string'}}, duplicate_of:{type:['integer','null']}, observation:{$ref:'#/components/schemas/Observation'} } },
         NativeChartRow: { type:'object', properties:{ date:{type:'string'}, retail_price:{type:['number','null']}, market_price:{type:['number','null']}, spread:{type:['number','null']}, evidence_count:{type:'integer'}, confidence:{type:'string'}, tier:{type:'string'}, source:{type:'string'} }, required:['date','retail_price','market_price'] },
         NativeChart: { type:'object', description:'Explicit line-chart specification. Render rows as time series; date is x and y_fields are price series. Preserve hoverable points.', properties:{ chart_type:{type:'string',enum:['line']}, title:{type:'string'}, x_field:{type:'string',enum:['date']}, y_fields:{type:'array',items:{type:'string'}}, x_label:{type:'string'}, y_label:{type:'string'}, interaction:{type:'string',enum:['hover']}, description:{type:'string'}, product:{type:'string'}, rows:{type:'array',items:{$ref:'#/components/schemas/NativeChartRow'}} }, required:['chart_type','title','x_field','y_fields','rows'] },
+        VisualFunnel: { type:'object', properties:{ observed:{type:'integer'}, verified:{type:'integer'}, actionable:{type:'integer'}, enriched:{type:'integer'}, investigate:{type:'integer'}, opportunities:{type:'integer'} } },
         VisualSummary: { type:'object', description:'Chart-ready summary for source health, procurement funnel, and opportunity signals.', additionalProperties:true },
+        AnalyzeObservationsResponse: { type:'object', properties:{ run_id:{type:'string'}, status:{type:'string'}, started_at:{type:'string'}, completed_at:{type:'string'}, duration_ms:{type:'integer'}, sources:{type:'array',items:{$ref:'#/components/schemas/SourceStatus'}}, observations:{type:'array',items:{$ref:'#/components/schemas/Observation'}}, normalized_observations:{type:'array',items:{$ref:'#/components/schemas/Observation'}}, eligible_observations:{type:'array',items:{$ref:'#/components/schemas/Observation'}}, rejected_items:{type:'array',items:{$ref:'#/components/schemas/RejectedItem'}}, market_estimates:{type:'array',items:{type:'object'}}, market_matches:{type:'array',items:{type:'object'}}, opportunity_candidates:{type:'array',items:{type:'object'}}, eligibility_summary:{type:'object',additionalProperties:true}, visual_summary:{$ref:'#/components/schemas/VisualSummary'}, native_chart_data:{type:'array',description:'Preferred input for native conversational price charts. Each item is an explicit date-based line-chart series.',items:{$ref:'#/components/schemas/NativeChart'}} }, required:['run_id','status','started_at','completed_at','duration_ms','sources','observations','normalized_observations','eligible_observations','rejected_items','market_estimates','market_matches','opportunity_candidates','eligibility_summary','visual_summary','native_chart_data'] },
         RunMonitorResponse: { type:'object', properties:{ run_id:{type:'string'}, status:{type:'string'}, started_at:{type:'string'}, completed_at:{type:'string'}, duration_ms:{type:'integer'}, sources:{type:'array',items:{$ref:'#/components/schemas/SourceStatus'}}, observations:{type:'array',items:{$ref:'#/components/schemas/Observation'}}, market_estimates:{type:'array',items:{type:'object'}}, opportunity_candidates:{type:'array',items:{type:'object'}}, visual_summary:{$ref:'#/components/schemas/VisualSummary'}, native_chart_data:{type:'array',description:'Preferred input for native conversational price charts. Each item is an explicit date-based line-chart series.',items:{$ref:'#/components/schemas/NativeChart'}}, error:{type:'string'} }, required:['run_id','status','started_at','completed_at','duration_ms','sources','observations','market_estimates','opportunity_candidates','visual_summary','native_chart_data'] }
       }
     }
@@ -115,9 +124,18 @@ async function executeRunMonitor() {
   }
 }
 
+async function executeAnalyzeObservations(payload) {
+  const runId = crypto.randomUUID(); const startedAt = new Date().toISOString(); const t0 = Date.now();
+  const result = await analyzeExternalObservations(payload, { observedAt: startedAt });
+  const completedAt = new Date().toISOString();
+  const visualSummary = buildVisualSummary({ observations: result.observations, candidates: result.opportunity_candidates, sourceStatuses: { statuses: result.sources }, marketEstimates: result.market_estimates, generatedAt: completedAt });
+  return { run_id:runId,status:'success',started_at:startedAt,completed_at:completedAt,duration_ms:Date.now()-t0,sources:result.sources,observations:result.observations,normalized_observations:result.normalized_observations,eligible_observations:result.eligible_observations,rejected_items:result.rejected_items,market_estimates:result.market_estimates,market_matches:result.market_matches,opportunity_candidates:result.opportunity_candidates,eligibility_summary:result.eligibility_summary,visual_summary:visualSummary,native_chart_data:buildNativeChartData(visualSummary) };
+}
+
 app.get('/health',(req,res)=>res.json({status:'ok',service:'pokemon-restock-run-monitor',auth_required:Boolean(token)}));
 app.get('/openapi.json',(req,res)=>res.json(openApiSpec(req)));
+app.post('/analyze_observations',async(req,res)=>{ if(!isAuthorized(req)) return res.status(401).json({status:'unauthorized'}); try{const response=await executeAnalyzeObservations(req.body);res.json(response);}catch(err){res.status(500).json({status:'error',error:err.message});} });
 app.post('/run_monitor',async(req,res)=>{ if(!isAuthorized(req)) return res.status(401).json({status:'unauthorized'}); if(activeRun) return res.status(409).json({status:'busy',message:'run_monitor is already in progress'}); activeRun=executeRunMonitor(); try{const response=await activeRun;res.status(response.status==='success'?200:500).json(response);}finally{activeRun=null;} });
 
 if(require.main===module){const hasHostedPort=Boolean(process.env.PORT);const port=parseInt(process.env.RUN_MONITOR_PORT||process.env.PORT||'8787',10);const host=process.env.RUN_MONITOR_HOST||(hasHostedPort?'0.0.0.0':'127.0.0.1');app.listen(port,host,()=>{console.log(`[run_monitor] listening on http://${host}:${port}`);console.log(`[run_monitor] auth ${token?'enabled':'disabled'}${host==='127.0.0.1'?' (local bind)':''}`);});}
-module.exports={app,executeRunMonitor,sourcesFrom,openApiSpec,publicBaseUrl,buildNativeChartData};
+module.exports={app,executeRunMonitor,executeAnalyzeObservations,sourcesFrom,openApiSpec,publicBaseUrl,buildNativeChartData};

@@ -44,20 +44,25 @@ describe('run-monitor service OpenAPI server URL', () => {
     assert.deepEqual(spec.servers, [{ url: 'https://pokemon-restock.onrender.com' }]);
   });
 
-  it('advertises only run_monitor as a GPT action', () => {
+  it('advertises analyze_observations and run_monitor as GPT actions', () => {
     const spec = openApiSpec(makeReq());
-    assert.deepEqual(Object.keys(spec.paths), ['/run_monitor']);
+    assert.deepEqual(Object.keys(spec.paths), ['/analyze_observations', '/run_monitor']);
+    assert.equal(spec.paths['/analyze_observations'].post.operationId, 'analyze_observations');
     assert.equal(spec.paths['/run_monitor'].post.operationId, 'run_monitor');
   });
 
-  it('advertises visual_summary in the run_monitor payload', () => {
+  it('advertises the gather-first analysis flow and chart-ready payloads', () => {
     const spec = openApiSpec(makeReq());
     const responseSchema = spec.components.schemas.RunMonitorResponse;
-    assert.equal(spec.info.version, '0.2.0');
-    assert.match(spec.info.description, /chart-ready visual_summary/);
-    assert.match(spec.paths['/run_monitor'].post.summary, /chart-ready/);
-    assert.match(spec.paths['/run_monitor'].post.description, /market opportunity graphs/);
+    const analyzeSchema = spec.components.schemas.AnalyzeObservationsResponse;
+    assert.equal(spec.info.version, '0.3.0');
+    assert.match(spec.info.description, /gather public listings first/);
+    assert.match(spec.paths['/analyze_observations'].post.description, /Search presence is not confirmed stock/);
+    assert.match(spec.paths['/run_monitor'].post.description, /autonomous internal-source sweep/);
     assert.ok(responseSchema.required.includes('visual_summary'));
+    assert.ok(analyzeSchema.required.includes('rejected_items'));
+    assert.ok(analyzeSchema.required.includes('market_matches'));
+    assert.ok(analyzeSchema.required.includes('native_chart_data'));
     assert.deepEqual(responseSchema.properties.visual_summary, { $ref: '#/components/schemas/VisualSummary' });
     assert.equal(spec.components.schemas.VisualSummary.description.includes('Chart-ready summary'), true);
     assert.deepEqual(Object.keys(spec.components.schemas.VisualFunnel.properties), [

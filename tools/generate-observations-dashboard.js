@@ -57,7 +57,7 @@ function healthValue(status) {
 function buildVisualSummary({ observations, candidates, sourceStatuses, marketEstimates, generatedAt }) {
   const statuses = Array.isArray(sourceStatuses?.statuses) ? sourceStatuses.statuses : [];
   const sourceHealth = statuses.filter(entry => entry.source !== 'market' && entry.status !== 'disabled').map(entry => ({
-    source: entry.source, status: entry.status || 'unknown', observations: Number(entry.product_count || 0), elapsed_ms: entry.elapsed_ms ?? null, message: entry.message || null, render_value: healthValue(entry.status),
+    source: entry.source, status: entry.status || 'unknown', observations: Number(entry.product_count ?? entry.productCount ?? 0), elapsed_ms: entry.elapsed_ms ?? entry.elapsedMs ?? null, message: entry.message || null, render_value: healthValue(entry.status),
   }));
   const enriched = Array.isArray(marketEstimates) ? marketEstimates.filter(entry => entry.market?.status === 'success').length : 0;
   const signals = candidates.map(candidate => ({

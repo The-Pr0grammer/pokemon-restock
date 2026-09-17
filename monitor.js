@@ -42,6 +42,10 @@ const msrpMod         = require('./msrpChecker');
 const stateMod        = require('./stateManager');
 const marketMod       = require('./market');
 const opportunityMod  = require('./opportunities');
+const {
+  sourceStatus,
+  buildCanonicalObservations,
+} = require('./procurement/observations');
 
 // ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -85,16 +89,6 @@ function elapsed(startMs) {
   return s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
 }
 
-function sourceStatus(source, status, details = {}) {
-  return {
-    source,
-    status,
-    productCount: details.productCount ?? 0,
-    elapsedMs: details.elapsedMs ?? null,
-    message: details.message ?? null,
-  };
-}
-
 function classifyError(err) {
   if (err?.sourceStatus) return err.sourceStatus;
   if (err?.code === 'SOURCE_TIMEOUT') return 'timeout';
@@ -136,83 +130,6 @@ function writeSourceStatuses(statuses) {
     generatedAt: new Date().toISOString(),
     statuses,
   }, null, 2));
-}
-
-function availabilityFromProduct(product) {
-  if (product.stockStatus === 'pre_order') return 'pre_order';
-  if (product.stockStatus === 'out_of_stock') return 'out_of_stock';
-  if (product.inStock === true || product.stockStatus === 'in_stock') return 'in_stock';
-  return 'unknown';
-}
-
-function canonicalUrl(product) {
-  if (!product.url) return null;
-  if (/^https?:\/\//i.test(product.url)) return product.url;
-  if (product.retailer === 'barnesandnoble' && product.url.startsWith('/')) {
-    return `https://www.barnesandnoble.com${product.url}`;
-  }
-  return product.url;
-}
-
-function canonicalObservation(product, sourceStatusEntry, observedAt) {
-  const source = product.retailer || sourceStatusEntry?.source || OBSERVATION_SOURCE;
-  const sourceListingId = product.shopifyId || product.tcin || product.sku || product.asin || product.ean || product.id || null;
-  const productId = product.ean || product.tcin || product.sku || product.asin || product.id || sourceListingId;
-  const url = canonicalUrl(product);
-  const verificationState = sourceStatusEntry?.status !== 'success'
-    ? 'unverified'
-    : (!url ? 'inferred' : /\/search(?:\?|$)|[?&]q=/i.test(url) ? 'search_result' : 'direct_product_page');
-
-  const observation = {
-    source,
-    source_type: 'retail_listing',
-    source_listing_id: sourceListingId != null ? String(sourceListingId) : null,
-    product_id: productId != null ? String(productId) : null,
-    name: product.name || null,
-    price: Number.isFinite(product.priceNumeric) ? product.priceNumeric : null,
-    currency: product.priceNumeric != null ? 'USD' : null,
-    availability: availabilityFromProduct(product),
-    url,
-    observed_at: observedAt,
-    confidence: verificationState === 'direct_product_page' ? 'verified' : 'unverified',
-    verification_state: verificationState,
-    source_status: sourceStatusEntry?.status || 'unknown',
-    raw_status: product.stockStatus || null,
-  };
-
-  const optionalFields = [
-    'sellerName',
-    'sellerType',
-    'membershipRequired',
-    'productKind',
-    'bundleComponents',
-    'quantity',
-    'unitAcquisitionPrice',
-    'fulfillment',
-    'pickupStatus',
-    'memberPrice',
-    'publicPrice',
-  ];
-
-  for (const field of optionalFields) {
-    if (product[field] !== undefined) {
-      const canonicalField = field.replace(/[A-Z]/g, char => `_${char.toLowerCase()}`);
-      observation[canonicalField] = product[field];
-    }
-  }
-
-  return observation;
-}
-
-function buildCanonicalObservations(scraperResults, sourceStatuses, observedAt = new Date().toISOString()) {
-  const selected = OBSERVATION_SOURCE === 'all'
-    ? scraperResults.filter(result => result.status === 'success')
-    : scraperResults.filter(result => result.key === OBSERVATION_SOURCE && result.status === 'success');
-
-  return selected.flatMap(result => {
-    const status = sourceStatuses.find(entry => entry.source === result.key);
-    return (result.products || []).map(product => canonicalObservation(product, status, observedAt));
-  });
 }
 
 function writeObservations(observations) {
@@ -653,7 +570,7 @@ async function run({ isDryRun = false, forceInit = false } = {}) {
     }),
   ));
   sourceStatuses.push(redditResult.status);
-  const observations = buildCanonicalObservations(scraperResults, sourceStatuses, now);
+  const observations = buildCanonicalObservations(scraperResults, sourceStatuses, now, { selectedSource: OBSERVATION_SOURCE });
   writeObservations(observations);
   const { marketEstimates, opportunityCandidates, marketStatus } = await scanOpportunities(observations);
   sourceStatuses.push(marketStatus);
