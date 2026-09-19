@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { inferKind } = require('../procurement/product-identity');
 
 const API_BASE = 'https://api.justtcg.com/v1';
 const MARKET_SOURCE = 'justtcg';
@@ -23,19 +24,6 @@ function normalizeWords(value) {
 
 function identityTokens(value) {
   return normalizeWords(value).filter(token => !STOP_WORDS.has(token) && token.length > 1);
-}
-
-function inferKind(name) {
-  const text = String(name || '').toLowerCase();
-  if (/elite trainer|\betb\b/.test(text)) return 'ETB';
-  if (/booster box/.test(text)) return 'BOOSTER_BOX';
-  if (/booster bundle/.test(text)) return 'BOOSTER_BUNDLE';
-  if (/sleeved booster/.test(text)) return 'SLEEVED_BOOSTER';
-  if (/booster pack/.test(text)) return 'BOOSTER_PACK';
-  if (/starter deck|deluxe deck|theme deck/.test(text)) return 'STARTER_DECK';
-  if (/\btin\b/.test(text)) return 'TIN';
-  if (/collection/.test(text)) return 'COLLECTION';
-  return null;
 }
 
 function productText(product) {
@@ -186,6 +174,8 @@ function buildEstimateFromProduct(observation, product, match, observedAt) {
       median_variant_price: Number(median(prices.map(entry => entry.price)).toFixed(2)),
       min_variant_price: Math.min(...prices.map(entry => entry.price)),
       max_variant_price: Math.max(...prices.map(entry => entry.price)),
+      variant_conditions: [...new Set(prices.map(entry => entry.condition).filter(Boolean))],
+      variant_printings: [...new Set(prices.map(entry => entry.printing).filter(Boolean))],
       latest_variant_update: prices.map(entry => entry.lastUpdated).filter(Boolean).sort().at(-1) || null,
     },
     trend: {

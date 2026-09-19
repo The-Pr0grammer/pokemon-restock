@@ -1,5 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { exactProductMatch } = require('../procurement/product-identity');
 
 const EBAY_SEARCH = 'https://www.ebay.com/sch/i.html';
 const MARKET_SOURCE = 'ebay_sold';
@@ -47,9 +48,9 @@ function isRelevantSoldTitle(observationName, soldTitle) {
   return matched >= Math.min(2, required.length);
 }
 
-function extractSoldPrices(html, observationName) {
+function extractSoldListings(html, observationName) {
   const $ = cheerio.load(html);
-  const prices = [];
+  const listings = [];
 
   $('.s-item').each((_, el) => {
     const title = $(el).find('.s-item__title').text().trim();
@@ -57,13 +58,17 @@ function extractSoldPrices(html, observationName) {
 
     const price = parsePrice($(el).find('.s-item__price').first().text());
     if (price == null || price <= 0) return;
-    prices.push(price);
+    listings.push({ title, price });
   });
 
-  return prices;
+  return listings;
 }
 
-async function fetchEbaySoldEstimate(observation, { signal, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+function extractSoldPrices(html, observationName) {
+  return extractSoldListings(html, observationName).map(listing => listing.price);
+}
+
+async function fetchEbaySoldEstimate(observation, { signal, timeoutMs = DEFAULT_TIMEOUT_MS, client = axios } = {}) {
   const observedAt = new Date().toISOString();
   const query = observation.name;
   const url = `${EBAY_SEARCH}?${new URLSearchParams({
@@ -73,7 +78,7 @@ async function fetchEbaySoldEstimate(observation, { signal, timeoutMs = DEFAULT_
     LH_Complete: '1',
   })}`;
 
-  const response = await axios.get(EBAY_SEARCH, {
+  const response = await client.get(EBAY_SEARCH, {
     params: {
       _nkw: query,
       _sacat: '0',
@@ -85,8 +90,9 @@ async function fetchEbaySoldEstimate(observation, { signal, timeoutMs = DEFAULT_
     signal,
   });
 
-  const prices = extractSoldPrices(response.data, observation.name);
-  const sample = prices.slice(0, 12);
+  const sample = extractSoldListings(response.data, observation.name)
+    .filter(listing => exactProductMatch(observation.name, listing.title))
+    .slice(0, 12);
 
   if (sample.length < MIN_EVIDENCE) {
     return {
@@ -98,18 +104,23 @@ async function fetchEbaySoldEstimate(observation, { signal, timeoutMs = DEFAULT_
       observed_at: observedAt,
       query,
       url,
+      message: 'Fewer than three exact-product sold listings',
     };
   }
 
   return {
     source: MARKET_SOURCE,
     status: 'success',
-    estimate: Number(median(sample).toFixed(2)),
+    estimate: Number(median(sample.map(listing => listing.price)).toFixed(2)),
     currency: 'USD',
     evidence_count: sample.length,
     observed_at: observedAt,
     query,
     url,
+    matched_product_name: observation.name,
+    identity_match_score: 1,
+    provenance: 'eBay sold listings with exact product titles',
+    evidence: sample,
   };
 }
 
@@ -158,6 +169,7 @@ module.exports = {
   estimateMarketPrices,
   fetchEbaySoldEstimate,
   extractSoldPrices,
+  extractSoldListings,
   isRelevantSoldTitle,
   parsePrice,
   marketErrorStatus,

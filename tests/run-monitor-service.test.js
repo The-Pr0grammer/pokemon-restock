@@ -55,14 +55,18 @@ describe('run-monitor service OpenAPI server URL', () => {
     const spec = openApiSpec(makeReq());
     const responseSchema = spec.components.schemas.RunMonitorResponse;
     const analyzeSchema = spec.components.schemas.AnalyzeObservationsResponse;
-    assert.equal(spec.info.version, '0.3.0');
-    assert.match(spec.info.description, /gather public listings first/);
+    assert.equal(spec.info.version, '0.4.0');
+    assert.match(spec.info.description, /GPT browses retail listings/);
     assert.match(spec.paths['/analyze_observations'].post.description, /Search presence is not confirmed stock/);
     assert.match(spec.paths['/run_monitor'].post.description, /autonomous internal-source sweep/);
     assert.ok(responseSchema.required.includes('visual_summary'));
     assert.ok(analyzeSchema.required.includes('rejected_items'));
+    assert.ok(analyzeSchema.required.includes('flip_candidates'));
+    assert.ok(analyzeSchema.required.includes('investigations'));
+    assert.ok(analyzeSchema.required.includes('flip_summary'));
     assert.ok(analyzeSchema.required.includes('market_matches'));
     assert.ok(analyzeSchema.required.includes('native_chart_data'));
+    assert.ok(spec.components.schemas.FlipSignal.properties.math.properties.estimated_net_profit);
     assert.deepEqual(responseSchema.properties.visual_summary, { $ref: '#/components/schemas/VisualSummary' });
     assert.equal(spec.components.schemas.VisualSummary.description.includes('Chart-ready summary'), true);
     assert.deepEqual(Object.keys(spec.components.schemas.VisualFunnel.properties), [

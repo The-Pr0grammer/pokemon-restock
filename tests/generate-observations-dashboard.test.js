@@ -36,15 +36,15 @@ const candidates = [
     name: 'Pokemon TCG: Safe Box',
     retail: { source: 'barnesandnoble', price: 24.99, currency: 'USD', url: 'https://example.com/safe' },
     market: { source: 'justtcg', estimate: 60, currency: 'USD', evidence_count: 1 },
-    math: { absolute_spread: 35.01, discount_pct: 58.35 },
+    math: { estimated_net_profit: 20.01, roi_pct: 80.07 },
     confidence: 'needs_confirmation',
   },
   {
-    candidate_type: 'opportunity_candidate',
+    candidate_type: 'flip_candidate',
     name: 'Pokemon TCG: Cleaner Box',
     retail: { source: 'bestbuy', price: 39.99, currency: 'USD', url: 'https://example.com/clean' },
     market: { source: 'justtcg', estimate: 80, currency: 'USD', evidence_count: 3 },
-    math: { absolute_spread: 40.01, discount_pct: 50.01 },
+    math: { estimated_net_profit: 20.01, roi_pct: 50.04 },
     confidence: 'candidate',
   },
 ];
@@ -135,7 +135,8 @@ describe('observations dashboard visual summary', () => {
     assert.match(html, /&lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt;/);
     assert.doesNotMatch(html, /cdn\.jsdelivr|unpkg\.com|https:\/\/cdn/i);
     assert.match(html, /investigate/);
-    assert.match(html, /opportunity_candidate/);
+    assert.match(html, /flip_candidate/);
+    assert.match(html, /Est\. Net Profit/);
   });
 
   it('omits the opportunity spread chart when no signals exist', () => {

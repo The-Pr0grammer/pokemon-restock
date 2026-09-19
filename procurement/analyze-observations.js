@@ -40,7 +40,18 @@ async function analyzeExternalObservations(payload, options = {}) {
   const marketEstimates = marketEnabled && eligibleObservations.length
     ? await marketMod.estimateMarketPrices(eligibleObservations, options.marketOptions || {})
     : [];
-  const opportunityCandidates = opportunityMod.buildOpportunityCandidates(eligibleObservations, marketEstimates, observedAt);
+  const assessed = opportunityMod.buildFlipAssessments(eligibleObservations, marketEstimates, observedAt, options.flipOptions || {});
+  const opportunityCandidates = [...assessed.flips, ...assessed.investigations];
+  const allRejected = [
+    ...rejectedItems.map(item => ({ ...item, classification: 'rejected' })),
+    ...assessed.rejectedItems,
+  ].sort((a, b) => a.index - b.index);
+  const rejectedReasons = Object.fromEntries(
+    Array.from(allRejected.reduce((counts, item) => {
+      counts.set(item.reason, (counts.get(item.reason) || 0) + 1);
+      return counts;
+    }, new Map()).entries())
+  );
 
   return {
     status: 'success',
@@ -49,15 +60,25 @@ async function analyzeExternalObservations(payload, options = {}) {
     observations,
     normalized_observations: observations,
     eligible_observations: eligibleObservations,
-    rejected_items: rejectedItems,
+    rejected_items: allRejected,
     market_estimates: marketEstimates,
     market_matches: marketEstimates,
+    flip_candidates: assessed.flips,
+    investigations: assessed.investigations,
+    flip_summary: {
+      outcome: assessed.flips.length ? 'flips_found' : 'none_found',
+      flip_candidates: assessed.flips.length,
+      investigate: assessed.investigations.length,
+      rejected: allRejected.length,
+      rejected_reasons: rejectedReasons,
+      economics_assumptions: assessed.settings,
+    },
     opportunity_candidates: opportunityCandidates,
     eligibility_summary: {
       submitted: inputObservations(payload).length,
       normalized: observations.length,
       eligible_for_market: eligibleObservations.length,
-      rejected: rejectedItems.length,
+      rejected: allRejected.length,
     },
   };
 }

@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { SOURCES, getProcurementSource } = require('./sources');
+const { retailIdentityStatus } = require('./product-identity');
 
 const SOURCE_ALIASES = Object.fromEntries(
   Object.entries(SOURCES).flatMap(([key, source]) => [
@@ -171,16 +172,19 @@ function matchesOfficialSeller(sourceKey, sellerName) {
 
 function firstPartyStatus(sourceKey, observation) {
   const source = getProcurementSource(sourceKey);
-  if (!source?.first_party_required) return { ok: true, reason: null };
-
   const sellerType = String(observation.seller_type || '').toLowerCase();
   const sellerName = observation.seller_name || '';
   if (sellerType === 'marketplace' || sellerType === 'third_party' || sellerType === '3p') {
     return { ok: false, reason: 'third_party_seller' };
   }
+  if (!source) {
+    return sellerType === 'first_party' && sellerName
+      ? { ok: true, reason: null }
+      : { ok: false, reason: 'seller_evidence_missing' };
+  }
+  if (!source.first_party_required) return { ok: true, reason: null };
   if (sellerName && matchesOfficialSeller(sourceKey, sellerName)) return { ok: true, reason: null };
   if (sellerName) return { ok: false, reason: 'third_party_seller' };
-  if (sellerType === 'first_party') return { ok: true, reason: null };
   return { ok: false, reason: 'seller_evidence_missing' };
 }
 
@@ -188,7 +192,9 @@ function normalizeExternalObservation(input, index, defaultObservedAt = new Date
   const source = normalizeSourceKey(input.source ?? input.retailer ?? input.retailer_name);
   const name = input.name ?? input.product_name ?? input.title ?? null;
   const url = input.url ?? input.product_url ?? null;
-  const price = parsePrice(input.price ?? input.current_price ?? input.sale_price);
+  const price = parsePrice(input.price ?? input.current_price ?? input.sale_price ?? input.acquisition_cost);
+  const acquisitionCost = parsePrice(input.acquisition_cost ?? price);
+  const identity = retailIdentityStatus(name);
   const availabilityEvidence = normalizeAvailability(input.availability_text ?? input.availability ?? input.raw_status ?? input.stock_status);
   const verificationState = directProductPageState(url, input.verification_state ?? input.verification?.state);
   const confidenceRequested = String(input.confidence ?? input.verification?.confidence ?? '').toLowerCase();
@@ -206,6 +212,8 @@ function normalizeExternalObservation(input, index, defaultObservedAt = new Date
     product_id: productId,
     name,
     price,
+    acquisition_cost: acquisitionCost,
+    acquisition_cost_basis: input.acquisition_cost != null ? 'submitted_total' : 'listed_price',
     currency: input.currency || (price != null ? 'USD' : null),
     availability: availabilityEvidence.availability,
     url,
@@ -216,6 +224,8 @@ function normalizeExternalObservation(input, index, defaultObservedAt = new Date
     raw_status: availabilityEvidence.raw_status,
     seller_name: seller.seller_name,
     seller_type: seller.seller_type,
+    product_kind: identity.product_kind || null,
+    fulfillment: input.fulfillment ?? null,
     provenance: {
       input_index: index,
       retrieval: input.provenance ?? input.retrieval ?? null,
@@ -225,8 +235,10 @@ function normalizeExternalObservation(input, index, defaultObservedAt = new Date
 
   const rejectReasons = [];
   if (!name) rejectReasons.push('product_name_missing');
+  else if (!identity.confirmed) rejectReasons.push(identity.reason);
   if (!url) rejectReasons.push('url_missing');
-  if (price == null) rejectReasons.push('retail_price_missing');
+  if (price == null || price <= 0 || acquisitionCost == null || acquisitionCost <= 0) rejectReasons.push('retail_price_missing');
+  if (observation.currency !== 'USD') rejectReasons.push('currency_mismatch');
   if (!availabilityEvidence.hasEvidence) rejectReasons.push('availability_evidence_missing');
   if (verificationState !== 'direct_product_page' || confidence !== 'verified') rejectReasons.push('retail_observation_not_verified');
   if (availabilityEvidence.availability !== 'in_stock') rejectReasons.push('retail_not_in_stock');

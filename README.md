@@ -144,14 +144,14 @@ POST /run_monitor
 
 `GET /health` is for hosting checks only. `/openapi.json` advertises two actions:
 
-- `POST /analyze_observations` is the preferred GPT flow. GPT gathers public web listings, then submits them for normalization, rejection, market enrichment, opportunity scoring, and chart-ready output.
+- `POST /analyze_observations` is the preferred flip-finder flow. GPT browses public retail product pages, then submits observations for verification, exact-product market comparison, and net-profit analysis.
 - `POST /run_monitor` remains the autonomous internal-source sweep using the repo's retailer adapters.
 
 ### `POST /analyze_observations`
 
-Submit externally gathered observations. The endpoint is intentionally not a scraping framework and does not do browser automation. It accepts listing facts such as source/retailer, product name, URL, price, seller, availability text, observed_at, identifiers, and verification metadata.
+Submit externally gathered observations. The endpoint is intentionally not a scraping framework and does not do browser automation. It accepts exact product/variant, source/retailer, direct URL, price, optional verified all-in `acquisition_cost`, seller, availability/fulfillment evidence, observed_at, identifiers, and provenance/verification metadata.
 
-Search-result presence is not stock evidence. Marketplace/third-party listings, duplicate observations, missing availability evidence, unverified search results, and observations without first-party seller evidence are returned in `rejected_items` and do not reach market enrichment.
+Search-result presence is not stock evidence. Marketplace/third-party listings, duplicate observations, unconfirmed variants, missing availability or price evidence, unverified search results, and observations without first-party seller evidence are returned in `rejected_items` and do not reach market enrichment.
 
 Example request:
 
@@ -160,12 +160,13 @@ Example request:
   "observations": [
     {
       "source": "walmart",
-      "product_name": "Pokemon TCG Elite Trainer Box",
+      "product_name": "Pokemon TCG Chaos Rising Elite Trainer Box",
       "url": "https://www.walmart.com/ip/example/123",
       "price": 49.99,
       "seller": "Walmart.com",
       "seller_type": "first_party",
       "availability_text": "In stock",
+      "fulfillment": "shipping available",
       "observed_at": "2026-09-17T00:00:00.000Z",
       "verification_state": "direct_product_page",
       "confidence": "verified",
@@ -175,7 +176,9 @@ Example request:
 }
 ```
 
-The response includes `observations`, `normalized_observations`, `eligible_observations`, `rejected_items`, `market_estimates`, `market_matches`, `opportunity_candidates`, `visual_summary`, and `native_chart_data`.
+The response has three decision classes: `flip_candidates` ranked by estimated net profit, `investigations` for promising economics with incomplete market evidence, and `rejected_items` with reasons. `flip_summary.outcome` is `flips_found` or `none_found`, with counts, rejection reasons, and economics assumptions. Each candidate includes expected resale, acquisition cost, estimated selling fees, outbound shipping, net proceeds, net profit, ROI, retail verification, and exact-match market evidence. Legacy `opportunity_candidates`, `visual_summary`, and `native_chart_data` remain for compatibility; the GPT should present flip cards first, with a chart only when multiple candidates merit comparison.
+
+Net profit is `expected resale - acquisition cost - selling fees - outbound shipping`; ROI is `net profit / acquisition cost`. Defaults are a 15% plus $0.30 selling fee, $7 outbound shipping, $10 minimum net profit, and 20% minimum ROI. Configure them with `FLIP_SELLING_FEE_RATE`, `FLIP_SELLING_FEE_FIXED`, `FLIP_OUTBOUND_SHIPPING`, `FLIP_MIN_NET_PROFIT`, and `FLIP_MIN_ROI_PCT`. These are estimates, not live marketplace fee quotes. If `acquisition_cost` is absent, the listed price is used and tax/inbound shipping may be missing from the estimate.
 
 ### `POST /run_monitor`
 
@@ -234,7 +237,7 @@ The response includes `observations`, `normalized_observations`, `eligible_obser
 }
 ```
 
-Set `RUN_MONITOR_TOKEN` to require `Authorization: Bearer <token>` on `POST /run_monitor`. Leave `RUN_MONITOR_HOST` unset for local-only binding. To make ChatGPT invoke it directly, deploy this service behind HTTPS and connect a custom tool/plugin/action that calls `POST /run_monitor` with that bearer token.
+Set `RUN_MONITOR_TOKEN` to require `Authorization: Bearer <token>` on both POST actions. Leave `RUN_MONITOR_HOST` unset for local-only binding. To make ChatGPT invoke the flip finder directly, deploy this service behind HTTPS and connect a custom tool/plugin/action that calls `POST /analyze_observations` with that bearer token.
 
 Render deployment settings:
 

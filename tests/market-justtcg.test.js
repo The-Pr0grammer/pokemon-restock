@@ -101,6 +101,7 @@ describe('JustTCG market provider', () => {
     assert.equal(estimate.status, 'success');
     assert.equal(estimate.estimate, 45);
     assert.equal(estimate.evidence.variant_count, 2);
+    assert.deepEqual(estimate.evidence.variant_printings, ['Normal', 'Holofoil']);
     assert.equal(estimate.evidence.price_history_points, 3);
     assert.equal(estimate.trend.median_price_change_24hr, 2);
     assert.equal(estimate.provenance, 'JustTCG API batch variant prices');

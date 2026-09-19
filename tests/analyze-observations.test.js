@@ -9,7 +9,7 @@ const originalEstimateMarketPrices = marketMod.estimateMarketPrices;
 function validListing(overrides = {}) {
   return {
     source: 'walmart',
-    product_name: 'Pokemon TCG Elite Trainer Box',
+    product_name: 'Pokemon TCG Mega Evolution Chaos Rising Elite Trainer Box',
     url: 'https://www.walmart.com/ip/pokemon-etb/123',
     price: 49.99,
     seller: 'Walmart.com',
@@ -34,6 +34,7 @@ beforeEach(() => {
       currency: 'USD',
       evidence_count: 3,
       identity_match_score: 0.92,
+      matched_product_name: observation.name,
       observed_at: '2026-09-17T00:01:00.000Z',
       url: 'https://example.com/market',
     },
@@ -106,7 +107,31 @@ describe('analyzeExternalObservations', () => {
     assert.equal(result.observations[0].procurement_eligible, true);
     assert.equal(result.market_estimates.length, 1);
     assert.equal(result.opportunity_candidates.length, 1);
-    assert.equal(result.opportunity_candidates[0].candidate_type, 'opportunity_candidate');
+    assert.equal(result.flip_candidates.length, 1);
+    assert.equal(result.opportunity_candidates[0].candidate_type, 'flip_candidate');
+    assert.equal(result.flip_candidates[0].math.estimated_net_profit, 19.21);
+    assert.equal(result.flip_summary.outcome, 'flips_found');
+  });
+
+  it('returns none found when market evidence is unavailable', async () => {
+    marketMod.estimateMarketPrices = async () => [];
+    const result = await analyzeExternalObservations({ observations: [validListing()] });
+
+    assert.equal(result.flip_summary.outcome, 'none_found');
+    assert.deepEqual(result.flip_candidates, []);
+    assert.deepEqual(result.investigations, []);
+    assert.equal(result.rejected_items[0].reason, 'market_evidence_missing');
+  });
+
+  it('rejects a generic product identity before market enrichment', async () => {
+    let called = false;
+    marketMod.estimateMarketPrices = async () => { called = true; return []; };
+    const result = await analyzeExternalObservations({
+      observations: [validListing({ product_name: 'Pokemon TCG Elite Trainer Box' })],
+    });
+
+    assert.equal(called, false);
+    assert.equal(result.rejected_items[0].reason, 'retail_variant_unconfirmed');
   });
 
   it('handles a mixed batch from multiple retailers', async () => {
